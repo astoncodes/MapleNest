@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-gray-50 text-gray-900;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-maple-600 text-white px-4 py-2 rounded-lg hover:bg-maple-700 transition-colors font-medium;
+  }
+  
+  .btn-secondary {
+    @apply bg-white text-maple-600 px-4 py-2 rounded-lg border-2 border-maple-600 hover:bg-maple-50 transition-colors font-medium;
+  }
+  
+  .card {
+    @apply bg-white rounded-lg shadow-md p-6 border border-gray-200;
+  }
+}
