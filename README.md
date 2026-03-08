@@ -13,36 +13,7 @@
 | Real-time | Supabase Realtime (chat) |
 | Deployment | Vercel |
 
-## Getting Started
 
-### 1. Clone the repo
-```bash
-git clone https://github.com/YOUR_USERNAME/maplenest.git
-cd maplenest
-```
-
-### 2. Install dependencies
-```bash
-npm install
-```
-
-### 3. Set up Supabase
-1. Create a free project at [supabase.com](https://supabase.com)
-2. Copy your project URL and anon key
-3. Create a `.env` file:
-
-```bash
-cp .env.example .env
-# Then fill in your Supabase credentials
-```
-
-### 4. Run the database schema
-Copy and run the SQL from `supabase/schema.sql` in your Supabase SQL editor.
-
-### 5. Start the dev server
-```bash
-npm run dev
-```
 
 ## Project Roadmap
 
