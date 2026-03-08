@@ -12,7 +12,16 @@ import ProfilePage from './pages/ProfilePage'
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
   if (loading) return <div className="flex items-center justify-center min-h-screen">Loading...</div>
-  return user ? children : <Navigate to="/login" replace />
+  if (!user) return <Navigate to="/login" replace />
+  return children
+}
+
+function LandlordRoute({ children }) {
+  const { user, loading, role } = useAuth()
+  if (loading) return <div className="flex items-center justify-center min-h-screen">Loading...</div>
+  if (!user) return <Navigate to="/login" replace />
+  if (role !== 'landlord') return <Navigate to="/profile" replace />
+  return children
 }
 
 function AppRoutes() {
@@ -26,7 +35,7 @@ function AppRoutes() {
         <Route path="/listings" element={<ListingsPage />} />
         <Route path="/listings/:id" element={<ListingDetailPage />} />
         <Route path="/create-listing" element={
-          <ProtectedRoute><CreateListingPage /></ProtectedRoute>
+          <LandlordRoute><CreateListingPage /></LandlordRoute>
         } />
         <Route path="/profile" element={
           <ProtectedRoute><ProfilePage /></ProtectedRoute>
