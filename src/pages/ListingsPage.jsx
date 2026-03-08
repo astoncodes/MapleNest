@@ -7,8 +7,10 @@ const TYPES = ['All', 'apartment', 'house', 'room', 'basement', 'condo', 'townho
 const TYPE_LABELS = { apartment: 'Apartment', house: 'House', room: 'Room', basement: 'Basement', condo: 'Condo', townhouse: 'Townhouse' }
 
 function ListingCard({ listing }) {
+  if (!listing) return null
   const image = listing.listing_images?.[0]?.url
-  const formatPrice = (p) => `$${p.toLocaleString()}`
+  const formatPrice = (p) => `$${Number(p || 0).toLocaleString()}`
+
 
   return (
     <Link to={`/listings/${listing.id}`} className="group bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-all overflow-hidden">
@@ -73,35 +75,72 @@ export default function ListingsPage() {
   const updateFilter = (key, value) => setFilters(prev => ({ ...prev, [key]: value }))
 
   useEffect(() => {
-    fetchListings()
-  }, [filters, search])
+  setSearch(searchParams.get('q') || '')
+  }, [searchParams])
+
 
   const fetchListings = async () => {
-    setLoading(true)
+  setLoading(true);
+
+  try {
     let query = supabase
       .from('listings')
       .select('*, listing_images(url, is_primary, sort_order)')
       .eq('status', 'active')
-      .order('created_at', { ascending: false })
+      .order('created_at', { ascending: false });
 
-    if (filters.city !== 'All') query = query.eq('city', filters.city)
-    if (filters.type !== 'All') query = query.eq('property_type', filters.type)
-    if (filters.minPrice) query = query.gte('price', parseInt(filters.minPrice))
-    if (filters.maxPrice) query = query.lte('price', parseInt(filters.maxPrice))
-    if (filters.bedrooms !== 'Any') query = query.eq('bedrooms', parseInt(filters.bedrooms))
-    if (filters.petFriendly) query = query.eq('pet_friendly', true)
-    if (filters.parking) query = query.eq('parking_available', true)
-    if (filters.utilitiesIncluded) query = query.eq('utilities_included', true)
-    if (search) query = query.ilike('title', `%${search}%`)
+    if (filters.city !== 'All')
+      query = query.eq('city', filters.city);
 
-    const { data } = await query
-    setListings(data || [])
-    setLoading(false)
+    if (filters.type !== 'All')
+      query = query.eq('property_type', filters.type);
+
+    if (filters.minPrice)
+      query = query.gte('price', Number(filters.minPrice));
+
+    if (filters.maxPrice)
+      query = query.lte('price', Number(filters.maxPrice));
+
+    if (filters.bedrooms !== 'Any')
+      query = query.gte('bedrooms', Number(filters.bedrooms));
+
+
+    if (filters.petFriendly)
+      query = query.eq('pet_friendly', true);
+
+    if (filters.parking)
+      query = query.eq('parking_available', true);
+
+    if (filters.utilitiesIncluded)
+      query = query.eq('utilities_included', true);
+
+    if (search?.trim())
+      query = query.ilike('title', `%${search.trim()}%`);
+
+    const { data, error } = await query;
+
+    if (error) throw error;
+
+    setListings(data ?? []);
+
+  } catch (err) {
+    console.error("Error fetching listings:", err);
+    setListings([]); // optional fallback
+
+  } finally {
+    setLoading(false);
   }
-
+};
   const handleSearch = (e) => {
     e.preventDefault()
-    fetchListings()
+    const next = search.trim()
+    const params = Object.fromEntries([...searchParams])
+    if (next) {
+      params.q = next
+    } else {
+      delete params.q
+    }
+    setSearchParams(params, { replace: true })
   }
 
   const activeFilterCount = [
