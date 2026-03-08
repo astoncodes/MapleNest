@@ -60,6 +60,7 @@ export default function ListingsPage() {
   const [listings, setListings] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState(searchParams.get('q') || '')
+  const queryFromParams = searchParams.get('q') || ''
 
   const [filters, setFilters] = useState({
     city: 'All',
@@ -75,9 +76,12 @@ export default function ListingsPage() {
   const updateFilter = (key, value) => setFilters(prev => ({ ...prev, [key]: value }))
 
   useEffect(() => {
-  setSearch(searchParams.get('q') || '')
+    setSearch(queryFromParams || '')
   }, [searchParams])
 
+  useEffect(() => {
+    fetchListings()
+  }, [filters, queryFromParams])
 
   const fetchListings = async () => {
   setLoading(true);
@@ -141,6 +145,7 @@ export default function ListingsPage() {
       delete params.q
     }
     setSearchParams(params, { replace: true })
+    fetchListings()
   }
 
   const activeFilterCount = [
