@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { canModifyListing } from '../utils/listingPermissions'
+import ConfirmModal from '../components/shared/ConfirmModal'
 
 const TYPE_LABELS = { apartment: 'Apartment', house: 'House', room: 'Room', basement: 'Basement Suite', condo: 'Condo', townhouse: 'Townhouse' }
 const LEASE_LABELS = { monthly: 'Month-to-Month', '6_months': '6 Months', '1_year': '1 Year', flexible: 'Flexible' }
@@ -19,6 +20,7 @@ export default function ListingDetailPage() {
   const [contactError, setContactError] = useState(null)
   const [manageLoading, setManageLoading] = useState(false)
   const [manageError, setManageError] = useState(null)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   useEffect(() => {
     fetchListing()
@@ -51,7 +53,14 @@ export default function ListingDetailPage() {
     setLoading(false)
 
     // Increment view count
-    await supabase.from('listings').update({ views: (data.views || 0) + 1 }).eq('id', id)
+    const { error: viewError } = await supabase
+      .from('listings')
+      .update({ views: (data.views || 0) + 1 })
+      .eq('id', id)
+
+    if (viewError && viewError.code !== '42501') {
+      console.warn('Could not update listing views:', viewError.message)
+    }
   }
 
   const handleContact = async () => {
@@ -98,20 +107,32 @@ export default function ListingDetailPage() {
   const canModify = canModifyListing(user, listing)
 
   const handleDelete = async () => {
-    if (!listing?.id || !canModify || !window.confirm('Remove this listing? It will be marked as removed.')) return
+    if (!listing?.id || !user?.id || !canModify) return
+    setShowDeleteConfirm(false)
 
     setManageLoading(true)
     setManageError(null)
     try {
-      const { error } = await supabase
+      const { data: removed, error } = await supabase
         .from('listings')
-        .update({ status: 'removed' })
+        .delete()
         .eq('id', listing.id)
+        .eq('landlord_id', user.id)
+        .select('id')
 
       if (error) throw error
+      if (!removed || removed.length === 0) {
+        setManageError('Could not delete listing. It may have already been deleted or you may not be authorized.')
+        return
+      }
+
       navigate('/profile')
-    } catch (_err) {
-      setManageError('Could not remove listing. Please try again.')
+    } catch (err) {
+      if (err?.code === '42501') {
+        setManageError('Delete blocked by permissions. Make sure you are signed in as this listing owner and your profile role is landlord.')
+      } else {
+        setManageError(err?.message || 'Could not delete listing. Please try again.')
+      }
     } finally {
       setManageLoading(false)
     }
@@ -268,9 +289,9 @@ export default function ListingDetailPage() {
                   className="w-full inline-block text-center bg-red-700 text-white py-3 rounded-lg font-semibold text-sm hover:bg-red-800 transition">
                   Edit listing
                 </Link>
-                <button onClick={handleDelete} disabled={manageLoading}
+                <button onClick={() => setShowDeleteConfirm(true)} disabled={manageLoading}
                   className="w-full border border-red-100 text-red-700 bg-white py-3 rounded-lg font-semibold text-sm hover:bg-red-50 transition disabled:opacity-50">
-                  {manageLoading ? 'Removing...' : 'Delete listing'}
+                  {manageLoading ? 'Deleting...' : 'Delete listing'}
                 </button>
               </div>
             ) : (
@@ -279,6 +300,17 @@ export default function ListingDetailPage() {
                 {contacting ? 'Opening chat...' : '💬 Contact Landlord'}
               </button>
             )}
+
+            <ConfirmModal
+              isOpen={showDeleteConfirm}
+              title="Delete listing"
+              message="This action permanently deletes the listing and removes it from the platform."
+              confirmText="Delete listing"
+              cancelText="Keep listing"
+              loading={manageLoading}
+              onConfirm={handleDelete}
+              onCancel={() => setShowDeleteConfirm(false)}
+            />
 
             {!user && (
               <p className="text-xs text-gray-400 text-center mt-2">

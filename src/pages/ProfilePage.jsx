@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { canModifyListing } from '../utils/listingPermissions'
+import ConfirmModal from '../components/shared/ConfirmModal'
 
 export default function ProfilePage() {
   const { user, loading } = useAuth()
@@ -11,6 +12,7 @@ export default function ProfilePage() {
   const [error, setError] = useState('')
   const [listings, setListings] = useState([])
   const [removingListingId, setRemovingListingId] = useState(null)
+  const [pendingDeleteId, setPendingDeleteId] = useState(null)
 
   useEffect(() => {
     let isActive = true
@@ -31,8 +33,9 @@ export default function ProfilePage() {
           .maybeSingle(),
         supabase
           .from('listings')
-          .select('id, title, city, property_type, status, price, created_at')
+          .select('id, title, city, property_type, status, price, created_at, landlord_id')
           .eq('landlord_id', user.id)
+          .eq('status', 'active')
           .order('created_at', { ascending: false }),
       ])
 
@@ -71,22 +74,35 @@ export default function ProfilePage() {
   }, [listings])
 
   const handleDeleteListing = async (listingId) => {
-    if (!listingId || !window.confirm('Remove this listing? It will be marked as removed.')) return
+    if (!listingId || !user?.id) return
 
     setRemovingListingId(listingId)
     setError('')
     try {
-      const { error: removeError } = await supabase
+      const { data: removed, error: removeError } = await supabase
         .from('listings')
-        .update({ status: 'removed' })
+        .delete()
         .eq('id', listingId)
+        .eq('landlord_id', user.id)
+        .select('id')
 
       if (removeError) throw removeError
+      if (!removed || removed.length === 0) {
+        setError('Could not delete listing. It may already be removed or you may not be authorized.')
+        return
+      }
 
       setListings(prev => prev.filter(item => item.id !== listingId))
     } catch (err) {
-      setError(`Failed to remove listing: ${err.message}`)
+      if (err?.code === '42501') {
+        setError('Delete blocked by permissions. Make sure you are signed in as this listing owner and your profile role is landlord.')
+      } else if (err?.message) {
+        setError(`Failed to delete listing: ${err.message}`)
+      } else {
+        setError('Failed to delete listing.')
+      }
     } finally {
+      setPendingDeleteId(null)
       setRemovingListingId(null)
     }
   }
@@ -191,11 +207,11 @@ export default function ProfilePage() {
                             Edit
                           </Link>
                           <button
-                            onClick={() => handleDeleteListing(listing.id)}
+                            onClick={() => setPendingDeleteId(listing.id)}
                             disabled={removingListingId === listing.id}
                             className="text-xs font-medium text-gray-700 border border-gray-200 rounded px-2 py-1 hover:bg-gray-50 disabled:opacity-50"
                           >
-                            {removingListingId === listing.id ? 'Removing...' : 'Delete'}
+                            {removingListingId === listing.id ? 'Deleting...' : 'Delete'}
                           </button>
                         </>
                       )}
@@ -205,6 +221,16 @@ export default function ProfilePage() {
               </div>
             )}
       </div>
+      <ConfirmModal
+        isOpen={Boolean(pendingDeleteId)}
+        title="Delete listing"
+        message="This action permanently deletes the listing and removes it from the platform."
+        confirmText="Delete listing"
+        cancelText="Keep listing"
+        loading={Boolean(pendingDeleteId && removingListingId === pendingDeleteId)}
+        onConfirm={() => pendingDeleteId && handleDeleteListing(pendingDeleteId)}
+        onCancel={() => setPendingDeleteId(null)}
+      />
     </div>
   )
 }
