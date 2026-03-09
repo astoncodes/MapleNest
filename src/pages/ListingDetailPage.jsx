@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
+import { canModifyListing } from '../utils/listingPermissions'
 
 const TYPE_LABELS = { apartment: 'Apartment', house: 'House', room: 'Room', basement: 'Basement Suite', condo: 'Condo', townhouse: 'Townhouse' }
 const LEASE_LABELS = { monthly: 'Month-to-Month', '6_months': '6 Months', '1_year': '1 Year', flexible: 'Flexible' }
@@ -16,6 +17,8 @@ export default function ListingDetailPage() {
   const [activePhoto, setActivePhoto] = useState(0)
   const [contacting, setContacting] = useState(false)
   const [contactError, setContactError] = useState(null)
+  const [manageLoading, setManageLoading] = useState(false)
+  const [manageError, setManageError] = useState(null)
 
   useEffect(() => {
     fetchListing()
@@ -92,7 +95,27 @@ export default function ListingDetailPage() {
     }
   }
 
-  const isOwnListing = user?.id === listing?.landlord_id
+  const canModify = canModifyListing(user, listing)
+
+  const handleDelete = async () => {
+    if (!listing?.id || !canModify || !window.confirm('Remove this listing? It will be marked as removed.')) return
+
+    setManageLoading(true)
+    setManageError(null)
+    try {
+      const { error } = await supabase
+        .from('listings')
+        .update({ status: 'removed' })
+        .eq('id', listing.id)
+
+      if (error) throw error
+      navigate('/profile')
+    } catch (_err) {
+      setManageError('Could not remove listing. Please try again.')
+    } finally {
+      setManageLoading(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -235,8 +258,21 @@ export default function ListingDetailPage() {
               <div className="bg-red-50 text-red-700 text-xs px-3 py-2 rounded-lg mb-3">{contactError}</div>
             )}
 
-            {isOwnListing ? (
-              <div className="text-center text-sm text-gray-500 py-2">This is your listing</div>
+            {manageError && (
+              <div className="bg-red-50 text-red-700 text-xs px-3 py-2 rounded-lg mb-3">{manageError}</div>
+            )}
+
+            {canModify ? (
+              <div className="space-y-2">
+                <Link to={`/listings/${id}/edit`}
+                  className="w-full inline-block text-center bg-red-700 text-white py-3 rounded-lg font-semibold text-sm hover:bg-red-800 transition">
+                  Edit listing
+                </Link>
+                <button onClick={handleDelete} disabled={manageLoading}
+                  className="w-full border border-red-100 text-red-700 bg-white py-3 rounded-lg font-semibold text-sm hover:bg-red-50 transition disabled:opacity-50">
+                  {manageLoading ? 'Removing...' : 'Delete listing'}
+                </button>
+              </div>
             ) : (
               <button onClick={handleContact} disabled={contacting}
                 className="w-full bg-red-700 text-white py-3 rounded-lg font-semibold text-sm hover:bg-red-800 transition disabled:opacity-50">

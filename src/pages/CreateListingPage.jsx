@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 
@@ -27,8 +27,14 @@ const LEASE_TERMS = [
   { value: 'flexible', label: 'Flexible' },
 ]
 
-export default function CreateListingPage() {
-  const { user } = useAuth()
+export default function CreateListingPage({
+  mode = 'create',
+  listing = null,
+  onSubmitSuccess,
+  initialLoading = false,
+}) {
+  const isEditMode = mode === 'edit'
+  const { user, loading: authLoading, isLandlord } = useAuth()
   const navigate = useNavigate()
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
@@ -57,6 +63,33 @@ export default function CreateListingPage() {
   })
 
   const update = (field, value) => setForm(prev => ({ ...prev, [field]: value }))
+
+  useEffect(() => {
+    if (!isEditMode || !listing) return
+
+    setStep(1)
+    setPhotos([])
+    setPhotoPreviewUrls([])
+    setForm({
+      title: listing.title || '',
+      description: listing.description || '',
+      property_type: listing.property_type || '',
+      city: listing.city || 'Charlottetown',
+      neighbourhood: listing.neighbourhood || '',
+      address: listing.address || '',
+      price: String(listing.price ?? ''),
+      utilities_included: listing.utilities_included || false,
+      bedrooms: listing.bedrooms || 1,
+      bathrooms: listing.bathrooms || 1,
+      square_feet: listing.square_feet ? String(listing.square_feet) : '',
+      available_from: listing.available_from ? listing.available_from.split('T')[0] : '',
+      lease_term: listing.lease_term || '1_year',
+      pet_friendly: listing.pet_friendly || false,
+      parking_available: listing.parking_available || false,
+      laundry: listing.laundry || 'none',
+      furnished: listing.furnished || false,
+    })
+  }, [isEditMode, listing?.id, listing])
 
   const handlePhotos = (e) => {
     const files = Array.from(e.target.files).slice(0, 8)
@@ -93,34 +126,58 @@ export default function CreateListingPage() {
     setError(null)
     setLoading(true)
     try {
-      const { data, error: insertError } = await supabase
-        .from('listings')
-        .insert({
-          landlord_id: user.id,
-          title: form.title,
-          description: form.description,
-          property_type: form.property_type,
-          city: form.city,
-          neighbourhood: form.neighbourhood,
-          address: form.address,
-          price: parseInt(form.price),
-          utilities_included: form.utilities_included,
-          bedrooms: parseInt(form.bedrooms),
-          bathrooms: parseFloat(form.bathrooms),
-          square_feet: form.square_feet ? parseInt(form.square_feet) : null,
-          available_from: form.available_from || null,
-          lease_term: form.lease_term,
-          pet_friendly: form.pet_friendly,
-          parking_available: form.parking_available,
-          laundry: form.laundry,
-          furnished: form.furnished,
-          status: 'active',
-        })
-        .select()
-        .single()
-      if (insertError) throw insertError
+      const payload = {
+        title: form.title,
+        description: form.description,
+        property_type: form.property_type,
+        city: form.city,
+        neighbourhood: form.neighbourhood,
+        address: form.address,
+        price: parseInt(form.price),
+        utilities_included: form.utilities_included,
+        bedrooms: parseInt(form.bedrooms),
+        bathrooms: parseFloat(form.bathrooms),
+        square_feet: form.square_feet ? parseInt(form.square_feet) : null,
+        available_from: form.available_from || null,
+        lease_term: form.lease_term,
+        pet_friendly: form.pet_friendly,
+        parking_available: form.parking_available,
+        laundry: form.laundry,
+        furnished: form.furnished,
+      }
+
+      let data = null
+      if (isEditMode) {
+        const { data: updated, error: updateError } = await supabase
+          .from('listings')
+          .update(payload)
+          .eq('id', listing.id)
+          .select()
+          .single()
+
+        if (updateError) throw updateError
+        data = updated
+      } else {
+        const { data: created, error: insertError } = await supabase
+          .from('listings')
+          .insert({
+            landlord_id: user.id,
+            ...payload,
+            status: 'active',
+          })
+          .select()
+          .single()
+
+        if (insertError) throw insertError
+        data = created
+      }
+
       if (photos.length > 0) await uploadPhotos(data.id)
-      navigate(`/listings/${data.id}`)
+      if (onSubmitSuccess) {
+        onSubmitSuccess(data.id)
+      } else {
+        navigate(`/listings/${data.id}`)
+      }
     } catch (err) {
       setError(err.message)
     } finally {
@@ -137,12 +194,32 @@ export default function CreateListingPage() {
   const inputClass = "w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-300 focus:border-transparent bg-white"
   const labelClass = "block text-sm font-medium text-gray-700 mb-1.5"
 
+  if (authLoading || (isEditMode && !listing) || initialLoading) {
+    return <div className="max-w-2xl mx-auto px-4 py-10 text-gray-500">Loading profile...</div>
+  }
+
+  if (!isLandlord) {
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-10 text-center">
+        <h1 className="text-2xl font-bold text-gray-900 mb-3">
+          {isEditMode ? 'Only landlords can edit listings' : 'Only landlords can post listings'}
+        </h1>
+        <p className="text-gray-500 mb-6">Create a landlord account first, then you can post your spaces.</p>
+        <Link to="/profile" className="text-red-700 font-medium hover:underline">Back to profile</Link>
+      </div>
+    )
+  }
+
   return (
     <div className="max-w-2xl mx-auto px-4 py-10">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Post a Listing</h1>
-        <p className="text-gray-500 text-sm mt-1">Fill in your property details to connect with renters</p>
+        <h1 className="text-2xl font-bold text-gray-900">
+          {isEditMode ? 'Edit Listing' : 'Post a Listing'}
+        </h1>
+        <p className="text-gray-500 text-sm mt-1">
+          {isEditMode ? 'Update your listing details to keep things accurate' : 'Fill in your property details to connect with renters'}
+        </p>
       </div>
 
       {/* Step indicator */}
@@ -380,17 +457,23 @@ export default function CreateListingPage() {
             </button>
           ) : <div />}
 
-          {step < 3 ? (
-            <button onClick={() => setStep(s => s + 1)} disabled={!canProceed()}
-              className="px-6 py-2.5 text-sm font-semibold bg-red-700 text-white rounded-lg hover:bg-red-800 transition disabled:opacity-40 disabled:cursor-not-allowed">
-              Continue →
-            </button>
-          ) : (
-            <button onClick={handleSubmit} disabled={loading}
-              className="px-6 py-2.5 text-sm font-semibold bg-red-700 text-white rounded-lg hover:bg-red-800 transition disabled:opacity-50">
-              {loading ? 'Publishing...' : '🍁 Publish Listing'}
-            </button>
-          )}
+            {step < 3 ? (
+              <button onClick={() => setStep(s => s + 1)} disabled={!canProceed()}
+                className="px-6 py-2.5 text-sm font-semibold bg-red-700 text-white rounded-lg hover:bg-red-800 transition disabled:opacity-40 disabled:cursor-not-allowed">
+                Continue →
+              </button>
+            ) : (
+              <button onClick={handleSubmit} disabled={loading}
+                className="px-6 py-2.5 text-sm font-semibold bg-red-700 text-white rounded-lg hover:bg-red-800 transition disabled:opacity-50">
+              {loading
+                ? isEditMode
+                  ? 'Saving...'
+                  : 'Publishing...'
+                : isEditMode
+                  ? '💾 Save changes'
+                  : '🍁 Publish Listing'}
+              </button>
+            )}
         </div>
       </div>
     </div>

@@ -141,8 +141,24 @@ CREATE POLICY "Users can insert own profile" ON public.profiles FOR INSERT WITH 
 
 -- Listings: public read, landlord write
 CREATE POLICY "Listings are publicly viewable" ON public.listings FOR SELECT USING (status = 'active');
-CREATE POLICY "Landlords can create listings" ON public.listings FOR INSERT WITH CHECK (auth.uid() = landlord_id);
-CREATE POLICY "Landlords can update own listings" ON public.listings FOR UPDATE USING (auth.uid() = landlord_id);
+CREATE POLICY "Landlords can create listings" ON public.listings FOR INSERT WITH CHECK (
+  auth.uid() = landlord_id AND EXISTS (
+    SELECT 1 FROM public.profiles p
+    WHERE p.id = auth.uid() AND p.role = 'landlord'
+  )
+);
+CREATE POLICY "Landlords can update own listings" ON public.listings FOR UPDATE USING (
+  auth.uid() = landlord_id AND EXISTS (
+    SELECT 1 FROM public.profiles p
+    WHERE p.id = auth.uid() AND p.role = 'landlord'
+  )
+);
+CREATE POLICY "Landlords can delete own listings" ON public.listings FOR DELETE USING (
+  auth.uid() = landlord_id AND EXISTS (
+    SELECT 1 FROM public.profiles p
+    WHERE p.id = auth.uid() AND p.role = 'landlord'
+  )
+);
 
 -- Listing images: public read, landlord write
 CREATE POLICY "Images are publicly viewable" ON public.listing_images FOR SELECT USING (true);
@@ -172,8 +188,13 @@ CREATE POLICY "Participants can send messages" ON public.messages FOR INSERT
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO public.profiles (id, email)
-  VALUES (new.id, new.email);
+  INSERT INTO public.profiles (id, email, role, full_name)
+  VALUES (
+    new.id,
+    new.email,
+    COALESCE(new.raw_user_meta_data ->> 'role', 'renter'),
+    new.raw_user_meta_data ->> 'full_name'
+  );
   RETURN new;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

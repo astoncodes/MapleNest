@@ -7,7 +7,10 @@ import SignupPage from './pages/SignupPage'
 import ListingsPage from './pages/ListingsPage'
 import ListingDetailPage from './pages/ListingDetailPage'
 import CreateListingPage from './pages/CreateListingPage'
+import EditListingPage from './pages/EditListingPage'
 import ProfilePage from './pages/ProfilePage'
+import ForgotPasswordPage from './pages/ForgotPasswordPage'
+import ResetPasswordPage from './pages/ResetPasswordPage'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -33,7 +36,12 @@ function AppRoutes() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/listings" element={<ListingsPage />} />
+        <Route path="/listings/:id/edit" element={
+          <LandlordRoute><EditListingPage /></LandlordRoute>
+        } />
         <Route path="/listings/:id" element={<ListingDetailPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+<Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/create-listing" element={
           <LandlordRoute><CreateListingPage /></LandlordRoute>
         } />

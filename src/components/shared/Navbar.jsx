@@ -2,7 +2,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 
 export default function Navbar() {
-  const { user, signOut } = useAuth()
+  const { user, signOut, isLandlord } = useAuth()
   const navigate = useNavigate()
 
   const handleSignOut = async () => {
@@ -24,10 +24,12 @@ export default function Navbar() {
           </Link>
           {user ? (
             <>
-              <Link to="/create-listing"
-                className="bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-800 transition">
-                + Post Listing
-              </Link>
+              {isLandlord && (
+                <Link to="/create-listing"
+                  className="bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-800 transition">
+                  + Post Listing
+                </Link>
+              )}
               <Link to="/profile" className="text-gray-600 hover:text-gray-900 text-sm">Profile</Link>
               <button onClick={handleSignOut} className="text-gray-400 hover:text-gray-600 text-sm">Sign Out</button>
             </>

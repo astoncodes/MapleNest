@@ -15,7 +15,7 @@ export default function SignupPage() {
     e.preventDefault()
     setError(null)
     setLoading(true)
-    const { error } = await signUp(email, password)
+    const { error } = await signUp(email, password, role)
     setLoading(false)
     if (error) {
       setError(error.message)
