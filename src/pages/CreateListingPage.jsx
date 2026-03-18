@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 
@@ -27,19 +27,15 @@ const LEASE_TERMS = [
   { value: 'flexible', label: 'Flexible' },
 ]
 
-export default function CreateListingPage({
-  mode = 'create',
-  listing = null,
-  onSubmitSuccess,
-  initialLoading = false,
-}) {
-  const isEditMode = mode === 'edit'
-  const { user, loading: authLoading, isLandlord } = useAuth()
+export default function CreateListingPage() {
+  const { user } = useAuth()
   const navigate = useNavigate()
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
-  const [photos, setPhotos] = useState([])
+  const [uploadProgress, setUploadProgress] = useState(null)
+
+  const [photos, setPhotos] = useState([])           // File objects
   const [photoPreviewUrls, setPhotoPreviewUrls] = useState([])
 
   const [form, setForm] = useState({
@@ -64,122 +60,145 @@ export default function CreateListingPage({
 
   const update = (field, value) => setForm(prev => ({ ...prev, [field]: value }))
 
-  useEffect(() => {
-    if (!isEditMode || !listing) return
-
-    setStep(1)
-    setPhotos([])
-    setPhotoPreviewUrls([])
-    setForm({
-      title: listing.title || '',
-      description: listing.description || '',
-      property_type: listing.property_type || '',
-      city: listing.city || 'Charlottetown',
-      neighbourhood: listing.neighbourhood || '',
-      address: listing.address || '',
-      price: String(listing.price ?? ''),
-      utilities_included: listing.utilities_included || false,
-      bedrooms: listing.bedrooms || 1,
-      bathrooms: listing.bathrooms || 1,
-      square_feet: listing.square_feet ? String(listing.square_feet) : '',
-      available_from: listing.available_from ? listing.available_from.split('T')[0] : '',
-      lease_term: listing.lease_term || '1_year',
-      pet_friendly: listing.pet_friendly || false,
-      parking_available: listing.parking_available || false,
-      laundry: listing.laundry || 'none',
-      furnished: listing.furnished || false,
-    })
-  }, [isEditMode, listing?.id, listing])
-
   const handlePhotos = (e) => {
-    const files = Array.from(e.target.files).slice(0, 8)
-    setPhotos(files)
-    setPhotoPreviewUrls(files.map(f => URL.createObjectURL(f)))
+    const newFiles = Array.from(e.target.files)
+    const combined = [...photos, ...newFiles].slice(0, 8)
+    setPhotos(combined)
+    setPhotoPreviewUrls(combined.map(f => URL.createObjectURL(f)))
+    // Reset input so same file can be re-added if needed
+    e.target.value = ''
   }
 
   const removePhoto = (index) => {
-    setPhotos(prev => prev.filter((_, i) => i !== index))
-    setPhotoPreviewUrls(prev => prev.filter((_, i) => i !== index))
+    const updatedPhotos = photos.filter((_, i) => i !== index)
+    const updatedUrls = photoPreviewUrls.filter((_, i) => i !== index)
+    setPhotos(updatedPhotos)
+    setPhotoPreviewUrls(updatedUrls)
+  }
+
+  const movePhoto = (index, direction) => {
+    const newPhotos = [...photos]
+    const newUrls = [...photoPreviewUrls]
+    const targetIndex = index + direction
+    if (targetIndex < 0 || targetIndex >= newPhotos.length) return
+    ;[newPhotos[index], newPhotos[targetIndex]] = [newPhotos[targetIndex], newPhotos[index]]
+    ;[newUrls[index], newUrls[targetIndex]] = [newUrls[targetIndex], newUrls[index]]
+    setPhotos(newPhotos)
+    setPhotoPreviewUrls(newUrls)
   }
 
   const uploadPhotos = async (listingId) => {
-    const uploadedUrls = []
+    const uploadedImages = []
     for (let i = 0; i < photos.length; i++) {
       const file = photos[i]
-      const ext = file.name.split('.').pop()
-      const path = `${user.id}/${listingId}/${Date.now()}_${i}.${ext}`
-      const { error: uploadError } = await supabase.storage
+      setUploadProgress(`Uploading photo ${i + 1} of ${photos.length}...`)
+
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        console.warn(`Skipping non-image file: ${file.name}`)
+        continue
+      }
+
+      // Validate file size (10MB max)
+      if (file.size > 10 * 1024 * 1024) {
+        console.warn(`Skipping oversized file: ${file.name}`)
+        continue
+      }
+
+      const ext = file.name.split('.').pop().toLowerCase()
+      const safeName = `${Date.now()}_${i}.${ext}`
+      const path = `${user.id}/${listingId}/${safeName}`
+
+      const { data: uploadData, error: uploadError } = await supabase.storage
         .from('listing-images')
-        .upload(path, file)
-      if (uploadError) continue
-      const { data } = supabase.storage.from('listing-images').getPublicUrl(path)
-      uploadedUrls.push({ url: data.publicUrl, storage_path: path, is_primary: i === 0, sort_order: i })
+        .upload(path, file, {
+          cacheControl: '3600',
+          upsert: false,
+          contentType: file.type,
+        })
+
+      if (uploadError) {
+        console.error(`Upload failed for photo ${i + 1}:`, uploadError.message)
+        // Don't throw — keep uploading remaining photos
+        continue
+      }
+
+      const { data: urlData } = supabase.storage
+        .from('listing-images')
+        .getPublicUrl(uploadData.path)
+
+      uploadedImages.push({
+        listing_id: listingId,
+        url: urlData.publicUrl,
+        storage_path: uploadData.path,
+        is_primary: i === 0,
+        sort_order: i,
+      })
     }
-    if (uploadedUrls.length > 0) {
-      await supabase.from('listing_images').insert(
-        uploadedUrls.map(img => ({ ...img, listing_id: listingId }))
-      )
+
+    if (uploadedImages.length > 0) {
+      const { error: insertError } = await supabase
+        .from('listing_images')
+        .insert(uploadedImages)
+
+      if (insertError) {
+        console.error('Failed to save image records:', insertError.message)
+      }
     }
+
+    setUploadProgress(null)
+    return uploadedImages.length
   }
 
   const handleSubmit = async () => {
     setError(null)
     setLoading(true)
+
     try {
-      const payload = {
-        title: form.title,
-        description: form.description,
-        property_type: form.property_type,
-        city: form.city,
-        neighbourhood: form.neighbourhood,
-        address: form.address,
-        price: parseInt(form.price),
-        utilities_included: form.utilities_included,
-        bedrooms: parseInt(form.bedrooms),
-        bathrooms: parseFloat(form.bathrooms),
-        square_feet: form.square_feet ? parseInt(form.square_feet) : null,
-        available_from: form.available_from || null,
-        lease_term: form.lease_term,
-        pet_friendly: form.pet_friendly,
-        parking_available: form.parking_available,
-        laundry: form.laundry,
-        furnished: form.furnished,
+      // Insert listing
+      const { data, error: insertError } = await supabase
+        .from('listings')
+        .insert({
+          landlord_id: user.id,
+          title: form.title,
+          description: form.description,
+          property_type: form.property_type,
+          city: form.city,
+          neighbourhood: form.neighbourhood,
+          address: form.address,
+          price: parseInt(form.price),
+          utilities_included: form.utilities_included,
+          bedrooms: parseInt(form.bedrooms),
+          bathrooms: parseFloat(form.bathrooms),
+          square_feet: form.square_feet ? parseInt(form.square_feet) : null,
+          available_from: form.available_from || null,
+          lease_term: form.lease_term,
+          pet_friendly: form.pet_friendly,
+          parking_available: form.parking_available,
+          laundry: form.laundry,
+          furnished: form.furnished,
+          status: 'active',
+        })
+        .select()
+        .single()
+
+      if (insertError) throw insertError
+
+      // Upload photos if any
+      if (photos.length > 0) {
+        const uploaded = await uploadPhotos(data.id)
+        if (uploaded === 0 && photos.length > 0) {
+          // Photos failed but listing was created — navigate anyway with warning
+          setError('Listing created but photos failed to upload. You can add photos by editing the listing.')
+          setTimeout(() => navigate(`/listings/${data.id}`), 2500)
+          return
+        }
       }
 
-      let data = null
-      if (isEditMode) {
-        const { data: updated, error: updateError } = await supabase
-          .from('listings')
-          .update(payload)
-          .eq('id', listing.id)
-          .select()
-          .single()
-
-        if (updateError) throw updateError
-        data = updated
-      } else {
-        const { data: created, error: insertError } = await supabase
-          .from('listings')
-          .insert({
-            landlord_id: user.id,
-            ...payload,
-            status: 'active',
-          })
-          .select()
-          .single()
-
-        if (insertError) throw insertError
-        data = created
-      }
-
-      if (photos.length > 0) await uploadPhotos(data.id)
-      if (onSubmitSuccess) {
-        onSubmitSuccess(data.id)
-      } else {
-        navigate(`/listings/${data.id}`)
-      }
+      navigate(`/listings/${data.id}`)
     } catch (err) {
-      setError(err.message)
+      console.error('Listing creation failed:', err)
+      setError(err.message || 'Something went wrong. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -194,32 +213,11 @@ export default function CreateListingPage({
   const inputClass = "w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-300 focus:border-transparent bg-white"
   const labelClass = "block text-sm font-medium text-gray-700 mb-1.5"
 
-  if (authLoading || (isEditMode && !listing) || initialLoading) {
-    return <div className="max-w-2xl mx-auto px-4 py-10 text-gray-500">Loading profile...</div>
-  }
-
-  if (!isLandlord) {
-    return (
-      <div className="max-w-2xl mx-auto px-4 py-10 text-center">
-        <h1 className="text-2xl font-bold text-gray-900 mb-3">
-          {isEditMode ? 'Only landlords can edit listings' : 'Only landlords can post listings'}
-        </h1>
-        <p className="text-gray-500 mb-6">Create a landlord account first, then you can post your spaces.</p>
-        <Link to="/profile" className="text-red-700 font-medium hover:underline">Back to profile</Link>
-      </div>
-    )
-  }
-
   return (
     <div className="max-w-2xl mx-auto px-4 py-10">
-      {/* Header */}
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">
-          {isEditMode ? 'Edit Listing' : 'Post a Listing'}
-        </h1>
-        <p className="text-gray-500 text-sm mt-1">
-          {isEditMode ? 'Update your listing details to keep things accurate' : 'Fill in your property details to connect with renters'}
-        </p>
+        <h1 className="text-2xl font-bold text-gray-900">Post a Listing</h1>
+        <p className="text-gray-500 text-sm mt-1">Fill in your property details to connect with renters</p>
       </div>
 
       {/* Step indicator */}
@@ -303,7 +301,7 @@ export default function CreateListingPage({
               <label className={labelClass}>Street Address</label>
               <input type="text" className={inputClass} value={form.address}
                 onChange={e => update('address', e.target.value)}
-                placeholder="e.g. 123 University Ave (optional — shown after contact)" />
+                placeholder="e.g. 123 University Ave (shown only after contact)" />
             </div>
 
             <div>
@@ -378,7 +376,6 @@ export default function CreateListingPage({
               </select>
             </div>
 
-            {/* Toggles */}
             <div className="grid grid-cols-2 gap-3 pt-2">
               {[
                 { field: 'utilities_included', label: '💡 Utilities Included' },
@@ -408,41 +405,87 @@ export default function CreateListingPage({
         {/* Step 3: Photos */}
         {step === 3 && (
           <div className="space-y-5">
-            <h2 className="font-semibold text-gray-800 text-lg mb-1">Photos</h2>
-            <p className="text-sm text-gray-500 mb-4">Add up to 8 photos. The first photo will be the main image.</p>
+            <div>
+              <h2 className="font-semibold text-gray-800 text-lg mb-1">Photos</h2>
+              <p className="text-sm text-gray-500">
+                Add up to 8 photos. The first photo is your main image — drag to reorder.
+              </p>
+            </div>
 
             {/* Upload area */}
-            <label className="block border-2 border-dashed border-gray-200 rounded-xl p-8 text-center cursor-pointer hover:border-red-300 hover:bg-red-50 transition">
-              <input type="file" accept="image/*" multiple className="hidden" onChange={handlePhotos} />
+            <label className={`block border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition ${
+              photos.length >= 8
+                ? 'border-gray-100 bg-gray-50 cursor-not-allowed'
+                : 'border-gray-200 hover:border-red-300 hover:bg-red-50'
+            }`}>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/heic"
+                multiple
+                className="hidden"
+                disabled={photos.length >= 8}
+                onChange={handlePhotos}
+              />
               <div className="text-3xl mb-2">📷</div>
-              <p className="text-sm font-medium text-gray-700">Click to upload photos</p>
-              <p className="text-xs text-gray-400 mt-1">JPG, PNG up to 10MB each — max 8 photos</p>
+              <p className="text-sm font-medium text-gray-700">
+                {photos.length >= 8 ? 'Maximum 8 photos reached' : 'Click to add photos'}
+              </p>
+              <p className="text-xs text-gray-400 mt-1">
+                JPG, PNG, WebP — max 10MB each · {photos.length}/8 added
+              </p>
             </label>
 
-            {/* Photo previews */}
-            {photoPreviewUrls.length > 0 && (
+            {/* Photo grid with reorder controls */}
+            {photos.length > 0 && (
               <div className="grid grid-cols-4 gap-2">
                 {photoPreviewUrls.map((url, i) => (
-                  <div key={i} className="relative aspect-square rounded-lg overflow-hidden group">
-                    <img src={url} alt="" className="w-full h-full object-cover" />
+                  <div key={i} className="relative group">
+                    <div className="aspect-square rounded-lg overflow-hidden bg-gray-100">
+                      <img src={url} alt={`Photo ${i + 1}`} className="w-full h-full object-cover" />
+                    </div>
+
+                    {/* Primary badge */}
                     {i === 0 && (
-                      <div className="absolute top-1 left-1 bg-red-700 text-white text-xs px-1.5 py-0.5 rounded font-medium">Main</div>
+                      <div className="absolute top-1 left-1 bg-red-700 text-white text-xs px-1.5 py-0.5 rounded font-medium">
+                        Main
+                      </div>
                     )}
-                    <button type="button" onClick={() => removePhoto(i)}
-                      className="absolute top-1 right-1 bg-black bg-opacity-60 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
-                      ✕
-                    </button>
+
+                    {/* Controls overlay */}
+                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 rounded-lg transition-all flex items-center justify-center opacity-0 group-hover:opacity-100 gap-1">
+                      {i > 0 && (
+                        <button type="button" onClick={() => movePhoto(i, -1)}
+                          className="bg-white text-gray-700 rounded text-xs px-1.5 py-1 font-bold hover:bg-gray-100"
+                          title="Move left">←</button>
+                      )}
+                      <button type="button" onClick={() => removePhoto(i)}
+                        className="bg-red-600 text-white rounded text-xs px-1.5 py-1 font-bold hover:bg-red-700"
+                        title="Remove">✕</button>
+                      {i < photos.length - 1 && (
+                        <button type="button" onClick={() => movePhoto(i, 1)}
+                          className="bg-white text-gray-700 rounded text-xs px-1.5 py-1 font-bold hover:bg-gray-100"
+                          title="Move right">→</button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
             )}
 
-            {/* Summary */}
-            <div className="bg-gray-50 rounded-lg p-4 text-sm space-y-1.5">
+            {/* Upload progress */}
+            {uploadProgress && (
+              <div className="bg-blue-50 border border-blue-200 text-blue-700 text-sm px-4 py-3 rounded-lg flex items-center gap-2">
+                <span className="animate-spin">⏳</span>
+                {uploadProgress}
+              </div>
+            )}
+
+            {/* Listing summary */}
+            <div className="bg-gray-50 rounded-lg p-4 text-sm space-y-1.5 border border-gray-100">
               <p className="font-medium text-gray-700 mb-2">Listing Summary</p>
-              <p className="text-gray-500">{form.title}</p>
+              <p className="text-gray-600 font-medium">{form.title}</p>
               <p className="text-gray-500">{form.city}{form.neighbourhood ? `, ${form.neighbourhood}` : ''}</p>
-              <p className="text-gray-500">${form.price}/month · {form.bedrooms}BR · {form.bathrooms}BA</p>
+              <p className="text-gray-500">${form.price}/month · {form.bedrooms} bed · {form.bathrooms} bath</p>
               <p className="text-gray-500 capitalize">{form.property_type?.replace('_', ' ')}</p>
             </div>
           </div>
@@ -451,29 +494,27 @@ export default function CreateListingPage({
         {/* Navigation */}
         <div className="flex justify-between mt-8 pt-6 border-t border-gray-100">
           {step > 1 ? (
-            <button onClick={() => setStep(s => s - 1)}
-              className="px-5 py-2.5 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition">
+            <button onClick={() => setStep(s => s - 1)} disabled={loading}
+              className="px-5 py-2.5 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition disabled:opacity-50">
               ← Back
             </button>
           ) : <div />}
 
-            {step < 3 ? (
-              <button onClick={() => setStep(s => s + 1)} disabled={!canProceed()}
-                className="px-6 py-2.5 text-sm font-semibold bg-red-700 text-white rounded-lg hover:bg-red-800 transition disabled:opacity-40 disabled:cursor-not-allowed">
-                Continue →
-              </button>
-            ) : (
-              <button onClick={handleSubmit} disabled={loading}
-                className="px-6 py-2.5 text-sm font-semibold bg-red-700 text-white rounded-lg hover:bg-red-800 transition disabled:opacity-50">
-              {loading
-                ? isEditMode
-                  ? 'Saving...'
-                  : 'Publishing...'
-                : isEditMode
-                  ? '💾 Save changes'
-                  : '🍁 Publish Listing'}
-              </button>
-            )}
+          {step < 3 ? (
+            <button onClick={() => setStep(s => s + 1)} disabled={!canProceed()}
+              className="px-6 py-2.5 text-sm font-semibold bg-red-700 text-white rounded-lg hover:bg-red-800 transition disabled:opacity-40 disabled:cursor-not-allowed">
+              Continue →
+            </button>
+          ) : (
+            <button onClick={handleSubmit} disabled={loading}
+              className="px-6 py-2.5 text-sm font-semibold bg-red-700 text-white rounded-lg hover:bg-red-800 transition disabled:opacity-50 flex items-center gap-2">
+              {loading ? (
+                <><span className="animate-spin">⏳</span> {uploadProgress || 'Publishing...'}</>
+              ) : (
+                '🍁 Publish Listing'
+              )}
+            </button>
+          )}
         </div>
       </div>
     </div>

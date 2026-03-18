@@ -3,6 +3,7 @@ import { Link, useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 
+
 // ── Star rating display ──────────────────────────────────────────────────────
 function StarRating({ rating, max = 5, size = 'sm' }) {
   const sz = size === 'lg' ? 'text-xl' : 'text-sm'

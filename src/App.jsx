@@ -12,6 +12,7 @@ import ProfilePage from './pages/ProfilePage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 
+
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
   if (loading) return <div className="flex items-center justify-center min-h-screen">Loading...</div>
@@ -48,6 +49,7 @@ function AppRoutes() {
         <Route path="/profile" element={
           <ProtectedRoute><ProfilePage /></ProtectedRoute>
         } />
+        <Route path="/profile/:id" element={<ProfilePage />} />  
       </Routes>
     </div>
   )

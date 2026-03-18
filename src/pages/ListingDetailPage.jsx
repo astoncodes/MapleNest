@@ -1,13 +1,156 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
-import { canModifyListing } from '../utils/listingPermissions'
-import ConfirmModal from '../components/shared/ConfirmModal'
 
-const TYPE_LABELS = { apartment: 'Apartment', house: 'House', room: 'Room', basement: 'Basement Suite', condo: 'Condo', townhouse: 'Townhouse' }
-const LEASE_LABELS = { monthly: 'Month-to-Month', '6_months': '6 Months', '1_year': '1 Year', flexible: 'Flexible' }
+const TYPE_LABELS = {
+  apartment: 'Apartment', house: 'House', room: 'Room',
+  basement: 'Basement Suite', condo: 'Condo', townhouse: 'Townhouse'
+}
+const LEASE_LABELS = {
+  monthly: 'Month-to-Month', '6_months': '6 Months',
+  '1_year': '1 Year', flexible: 'Flexible'
+}
 
+// ── Slideshow component ───────────────────────────────────────────────────────
+function PhotoSlideshow({ images }) {
+  const [active, setActive] = useState(0)
+  const [lightboxOpen, setLightboxOpen] = useState(false)
+
+  const prev = useCallback(() => setActive(i => (i - 1 + images.length) % images.length), [images.length])
+  const next = useCallback(() => setActive(i => (i + 1) % images.length), [images.length])
+
+  // Keyboard navigation
+  useEffect(() => {
+    if (!lightboxOpen) return
+    const handler = (e) => {
+      if (e.key === 'ArrowLeft') prev()
+      if (e.key === 'ArrowRight') next()
+      if (e.key === 'Escape') setLightboxOpen(false)
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [lightboxOpen, prev, next])
+
+  if (!images || images.length === 0) {
+    return (
+      <div className="aspect-video bg-gray-100 rounded-xl flex items-center justify-center text-gray-300 text-6xl">
+        🏠
+      </div>
+    )
+  }
+
+  return (
+    <>
+      {/* Main image */}
+      <div className="relative rounded-xl overflow-hidden bg-gray-100 group">
+        <div className="aspect-video">
+          <img
+            src={images[active].url}
+            alt={`Photo ${active + 1}`}
+            className="w-full h-full object-cover cursor-zoom-in"
+            onClick={() => setLightboxOpen(true)}
+          />
+        </div>
+
+        {/* Nav arrows — only show if multiple images */}
+        {images.length > 1 && (
+          <>
+            <button onClick={prev}
+              className="absolute left-3 top-1/2 -translate-y-1/2 bg-black bg-opacity-40 hover:bg-opacity-70 text-white rounded-full w-9 h-9 flex items-center justify-center transition opacity-0 group-hover:opacity-100">
+              ‹
+            </button>
+            <button onClick={next}
+              className="absolute right-3 top-1/2 -translate-y-1/2 bg-black bg-opacity-40 hover:bg-opacity-70 text-white rounded-full w-9 h-9 flex items-center justify-center transition opacity-0 group-hover:opacity-100">
+              ›
+            </button>
+          </>
+        )}
+
+        {/* Photo counter */}
+        <div className="absolute bottom-3 right-3 bg-black bg-opacity-50 text-white text-xs px-2.5 py-1 rounded-full">
+          {active + 1} / {images.length}
+        </div>
+
+        {/* Expand hint */}
+        <div className="absolute bottom-3 left-3 bg-black bg-opacity-50 text-white text-xs px-2.5 py-1 rounded-full opacity-0 group-hover:opacity-100 transition">
+          Click to expand
+        </div>
+      </div>
+
+      {/* Thumbnail strip */}
+      {images.length > 1 && (
+        <div className="flex gap-2 mt-2 overflow-x-auto pb-1">
+          {images.map((img, i) => (
+            <button key={i} onClick={() => setActive(i)}
+              className={`flex-shrink-0 w-16 h-12 rounded-lg overflow-hidden border-2 transition ${
+                i === active ? 'border-red-700 opacity-100' : 'border-transparent opacity-60 hover:opacity-90'
+              }`}>
+              <img src={img.url} alt="" className="w-full h-full object-cover" />
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Dot indicators for mobile */}
+      {images.length > 1 && (
+        <div className="flex justify-center gap-1.5 mt-2 md:hidden">
+          {images.map((_, i) => (
+            <button key={i} onClick={() => setActive(i)}
+              className={`w-1.5 h-1.5 rounded-full transition-all ${
+                i === active ? 'bg-red-700 w-3' : 'bg-gray-300'
+              }`} />
+          ))}
+        </div>
+      )}
+
+      {/* Lightbox */}
+      {lightboxOpen && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-95 z-50 flex items-center justify-center"
+          onClick={() => setLightboxOpen(false)}
+        >
+          <button
+            onClick={() => setLightboxOpen(false)}
+            className="absolute top-4 right-4 text-white text-2xl bg-white bg-opacity-10 rounded-full w-10 h-10 flex items-center justify-center hover:bg-opacity-20 transition z-10"
+          >
+            ✕
+          </button>
+
+          {images.length > 1 && (
+            <>
+              <button
+                onClick={e => { e.stopPropagation(); prev() }}
+                className="absolute left-4 text-white text-4xl bg-white bg-opacity-10 rounded-full w-12 h-12 flex items-center justify-center hover:bg-opacity-20 transition z-10"
+              >
+                ‹
+              </button>
+              <button
+                onClick={e => { e.stopPropagation(); next() }}
+                className="absolute right-4 text-white text-4xl bg-white bg-opacity-10 rounded-full w-12 h-12 flex items-center justify-center hover:bg-opacity-20 transition z-10"
+              >
+                ›
+              </button>
+            </>
+          )}
+
+          <img
+            src={images[active].url}
+            alt=""
+            className="max-h-screen max-w-full object-contain px-16"
+            onClick={e => e.stopPropagation()}
+          />
+
+          <div className="absolute bottom-4 text-white text-sm bg-black bg-opacity-50 px-3 py-1 rounded-full">
+            {active + 1} / {images.length}
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
 export default function ListingDetailPage() {
   const { id } = useParams()
   const { user } = useAuth()
@@ -15,52 +158,44 @@ export default function ListingDetailPage() {
   const [listing, setListing] = useState(null)
   const [landlord, setLandlord] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [activePhoto, setActivePhoto] = useState(0)
   const [contacting, setContacting] = useState(false)
   const [contactError, setContactError] = useState(null)
-  const [manageLoading, setManageLoading] = useState(false)
-  const [manageError, setManageError] = useState(null)
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   useEffect(() => {
     fetchListing()
   }, [id])
 
   const fetchListing = async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('listings')
-      .select('*, listing_images(url, is_primary, sort_order)')
+      .select('*, listing_images(id, url, is_primary, sort_order)')
       .eq('id', id)
       .single()
 
-    if (!data) { navigate('/listings'); return }
+    if (error || !data) { navigate('/listings'); return }
 
-    // Sort images
-    if (data.listing_images) {
-      data.listing_images.sort((a, b) => a.sort_order - b.sort_order)
+    // Sort images: primary first, then by sort_order
+    if (data.listing_images?.length > 0) {
+      data.listing_images.sort((a, b) => {
+        if (a.is_primary && !b.is_primary) return -1
+        if (!a.is_primary && b.is_primary) return 1
+        return a.sort_order - b.sort_order
+      })
     }
 
     setListing(data)
 
-    // Fetch landlord profile
     const { data: profile } = await supabase
       .from('profiles')
-      .select('*')
+      .select('id, full_name, email, avatar_url, email_verified, phone_verified, created_at, avg_rating, total_reviews')
       .eq('id', data.landlord_id)
       .single()
 
     setLandlord(profile)
     setLoading(false)
 
-    // Increment view count
-    const { error: viewError } = await supabase
-      .from('listings')
-      .update({ views: (data.views || 0) + 1 })
-      .eq('id', id)
-
-    if (viewError && viewError.code !== '42501') {
-      console.warn('Could not update listing views:', viewError.message)
-    }
+    // Increment view count (fire and forget)
+    supabase.from('listings').update({ views: (data.views || 0) + 1 }).eq('id', id)
   }
 
   const handleContact = async () => {
@@ -71,27 +206,18 @@ export default function ListingDetailPage() {
     setContactError(null)
 
     try {
-      // Check if conversation already exists
       const { data: existing } = await supabase
         .from('conversations')
         .select('id')
         .eq('listing_id', id)
         .eq('renter_id', user.id)
-        .single()
+        .maybeSingle()
 
-      if (existing) {
-        navigate(`/messages/${existing.id}`)
-        return
-      }
+      if (existing) { navigate(`/messages/${existing.id}`); return }
 
-      // Create new conversation
       const { data: convo, error } = await supabase
         .from('conversations')
-        .insert({
-          listing_id: id,
-          renter_id: user.id,
-          landlord_id: listing.landlord_id,
-        })
+        .insert({ listing_id: id, renter_id: user.id, landlord_id: listing.landlord_id })
         .select()
         .single()
 
@@ -104,105 +230,57 @@ export default function ListingDetailPage() {
     }
   }
 
-  const canModify = canModifyListing(user, listing)
-
-  const handleDelete = async () => {
-    if (!listing?.id || !user?.id || !canModify) return
-    setShowDeleteConfirm(false)
-
-    setManageLoading(true)
-    setManageError(null)
-    try {
-      const { data: removed, error } = await supabase
-        .from('listings')
-        .delete()
-        .eq('id', listing.id)
-        .eq('landlord_id', user.id)
-        .select('id')
-
-      if (error) throw error
-      if (!removed || removed.length === 0) {
-        setManageError('Could not delete listing. It may have already been deleted or you may not be authorized.')
-        return
-      }
-
-      navigate('/profile')
-    } catch (err) {
-      if (err?.code === '42501') {
-        setManageError('Delete blocked by permissions. Make sure you are signed in as this listing owner and your profile role is landlord.')
-      } else {
-        setManageError(err?.message || 'Could not delete listing. Please try again.')
-      }
-    } finally {
-      setManageLoading(false)
-    }
-  }
-
-  if (loading) {
-    return (
-      <div className="max-w-5xl mx-auto px-4 py-10 animate-pulse">
-        <div className="h-80 bg-gray-200 rounded-xl mb-6" />
-        <div className="h-8 bg-gray-200 rounded w-1/2 mb-4" />
-        <div className="h-4 bg-gray-200 rounded w-1/4" />
-      </div>
-    )
-  }
+  if (loading) return (
+    <div className="max-w-5xl mx-auto px-4 py-10 animate-pulse space-y-4">
+      <div className="h-80 bg-gray-200 rounded-xl" />
+      <div className="h-6 bg-gray-200 rounded w-1/2" />
+      <div className="h-4 bg-gray-200 rounded w-1/3" />
+    </div>
+  )
 
   const images = listing.listing_images || []
-  const formatPrice = (p) => `$${p.toLocaleString()}`
-  const formatDate = (d) => d ? new Date(d).toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric' }) : 'Immediately'
+  const isOwnListing = user?.id === listing.landlord_id
+  const formatPrice = p => `$${p.toLocaleString()}`
+  const formatDate = d => d
+    ? new Date(d).toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric' })
+    : 'Immediately'
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-gray-400 mb-4">
-        <Link to="/listings" className="hover:text-gray-600">Listings</Link>
+        <Link to="/listings" className="hover:text-gray-600 transition">← Back to listings</Link>
         <span>/</span>
-        <span className="text-gray-600 truncate">{listing.title}</span>
+        <span className="text-gray-600 truncate max-w-xs">{listing.title}</span>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
-        {/* Left: photos + details */}
+        {/* Left column */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Photo gallery */}
-          <div className="rounded-xl overflow-hidden bg-gray-100">
-            {images.length > 0 ? (
-              <>
-                <div className="aspect-video">
-                  <img src={images[activePhoto]?.url} alt={listing.title}
-                    className="w-full h-full object-cover" />
-                </div>
-                {images.length > 1 && (
-                  <div className="flex gap-2 p-2 overflow-x-auto">
-                    {images.map((img, i) => (
-                      <button key={i} onClick={() => setActivePhoto(i)}
-                        className={`flex-shrink-0 w-16 h-12 rounded overflow-hidden border-2 transition ${
-                          i === activePhoto ? 'border-red-700' : 'border-transparent'
-                        }`}>
-                        <img src={img.url} alt="" className="w-full h-full object-cover" />
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="aspect-video flex items-center justify-center text-gray-300 text-6xl">🏠</div>
-            )}
-          </div>
 
-          {/* Title & location */}
-          <div>
-            <div className="flex items-start justify-between gap-4 flex-wrap">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">{listing.title}</h1>
-                <p className="text-gray-500 mt-1">
-                  📍 {listing.neighbourhood ? `${listing.neighbourhood}, ` : ''}{listing.city}, PEI
-                </p>
+          {/* Photo slideshow */}
+          <PhotoSlideshow images={images} />
+
+          {/* Title + price */}
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 leading-tight">{listing.title}</h1>
+              <p className="text-gray-500 mt-1 text-sm">
+                📍 {listing.neighbourhood ? `${listing.neighbourhood}, ` : ''}{listing.city}, PEI
+              </p>
+              <div className="flex items-center gap-2 mt-2 flex-wrap text-xs text-gray-400">
+                <span>Posted {new Date(listing.created_at).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                <span>·</span>
+                <span>👁 {listing.views || 0} views</span>
+                {images.length > 0 && <><span>·</span><span>📷 {images.length} photo{images.length !== 1 ? 's' : ''}</span></>}
               </div>
-              <div className="text-right">
-                <div className="text-3xl font-bold text-red-700">{formatPrice(listing.price)}</div>
-                <div className="text-sm text-gray-400">/month</div>
-              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-3xl font-bold text-red-700">{formatPrice(listing.price)}</div>
+              <div className="text-sm text-gray-400">/month</div>
+              {listing.utilities_included && (
+                <div className="text-xs text-green-600 font-medium mt-1">✓ Utilities included</div>
+              )}
             </div>
           </div>
 
@@ -214,10 +292,10 @@ export default function ListingDetailPage() {
               { icon: '🚿', label: 'Bathrooms', value: listing.bathrooms },
               { icon: '📐', label: 'Size', value: listing.square_feet ? `${listing.square_feet} sqft` : '—' },
             ].map(s => (
-              <div key={s.label} className="bg-gray-50 rounded-lg p-3 text-center">
+              <div key={s.label} className="bg-gray-50 rounded-xl p-3 text-center border border-gray-100">
                 <div className="text-xl mb-1">{s.icon}</div>
                 <div className="text-sm font-semibold text-gray-800">{s.value}</div>
-                <div className="text-xs text-gray-400">{s.label}</div>
+                <div className="text-xs text-gray-400 mt-0.5">{s.label}</div>
               </div>
             ))}
           </div>
@@ -225,15 +303,15 @@ export default function ListingDetailPage() {
           {/* Description */}
           {listing.description && (
             <div>
-              <h2 className="font-semibold text-gray-800 mb-2">About this place</h2>
+              <h2 className="font-semibold text-gray-800 mb-2 text-lg">About this place</h2>
               <p className="text-gray-600 text-sm leading-relaxed whitespace-pre-line">{listing.description}</p>
             </div>
           )}
 
-          {/* Details */}
+          {/* Details grid */}
           <div>
-            <h2 className="font-semibold text-gray-800 mb-3">Details</h2>
-            <div className="grid grid-cols-2 gap-y-3 gap-x-6 text-sm">
+            <h2 className="font-semibold text-gray-800 mb-3 text-lg">Details</h2>
+            <div className="grid grid-cols-2 gap-y-3 gap-x-8 text-sm">
               {[
                 { label: 'Available', value: formatDate(listing.available_from) },
                 { label: 'Lease Term', value: LEASE_LABELS[listing.lease_term] || listing.lease_term },
@@ -243,7 +321,7 @@ export default function ListingDetailPage() {
                 { label: 'Parking', value: listing.parking_available ? '✅ Available' : '❌ No' },
                 { label: 'Furnished', value: listing.furnished ? '✅ Yes' : '❌ No' },
               ].map(d => (
-                <div key={d.label} className="flex justify-between border-b border-gray-50 pb-2">
+                <div key={d.label} className="flex justify-between py-2 border-b border-gray-50">
                   <span className="text-gray-500">{d.label}</span>
                   <span className="text-gray-800 font-medium text-right">{d.value}</span>
                 </div>
@@ -252,80 +330,74 @@ export default function ListingDetailPage() {
           </div>
         </div>
 
-        {/* Right: Contact card */}
+        {/* Right column — contact card */}
         <div className="space-y-4">
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 sticky top-20">
+
             {/* Landlord info */}
-            <div className="flex items-center gap-3 mb-4 pb-4 border-b border-gray-100">
-              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center text-red-700 font-bold text-lg">
-                {(landlord?.full_name || landlord?.email || '?')[0].toUpperCase()}
+            <Link to={`/profile/${landlord?.id}`} className="flex items-center gap-3 mb-4 pb-4 border-b border-gray-100 hover:opacity-80 transition">
+              <div className="w-11 h-11 bg-gradient-to-br from-red-600 to-red-800 rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
+                {landlord?.avatar_url
+                  ? <img src={landlord.avatar_url} alt="" className="w-full h-full rounded-full object-cover" />
+                  : (landlord?.full_name || landlord?.email || '?')[0].toUpperCase()
+                }
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="font-medium text-gray-800 text-sm">{landlord?.full_name || 'Landlord'}</p>
-                <div className="flex items-center gap-1 mt-0.5">
+                <div className="flex items-center gap-1 mt-0.5 flex-wrap">
                   {landlord?.email_verified && (
-                    <span className="text-xs bg-green-50 text-green-700 px-1.5 py-0.5 rounded font-medium">✓ Verified</span>
+                    <span className="text-xs bg-green-50 text-green-700 px-1.5 py-0.5 rounded-full font-medium border border-green-200">✓ Verified</span>
+                  )}
+                  {landlord?.avg_rating > 0 && (
+                    <span className="text-xs text-amber-500">{'★'.repeat(Math.round(landlord.avg_rating))} {landlord.avg_rating.toFixed(1)}</span>
                   )}
                 </div>
               </div>
-            </div>
+            </Link>
 
-            <div className="text-center mb-4">
-              <div className="text-2xl font-bold text-red-700">{formatPrice(listing.price)}</div>
-              <div className="text-xs text-gray-400">per month</div>
+            {/* Price */}
+            <div className="text-center mb-5">
+              <div className="text-3xl font-bold text-red-700">{formatPrice(listing.price)}</div>
+              <div className="text-xs text-gray-400 mt-0.5">per month</div>
             </div>
 
             {contactError && (
-              <div className="bg-red-50 text-red-700 text-xs px-3 py-2 rounded-lg mb-3">{contactError}</div>
+              <div className="bg-red-50 text-red-700 text-xs px-3 py-2 rounded-lg mb-3 border border-red-100">
+                {contactError}
+              </div>
             )}
 
-            {manageError && (
-              <div className="bg-red-50 text-red-700 text-xs px-3 py-2 rounded-lg mb-3">{manageError}</div>
-            )}
-
-            {canModify ? (
+            {isOwnListing ? (
               <div className="space-y-2">
-                <Link to={`/listings/${id}/edit`}
-                  className="w-full inline-block text-center bg-red-700 text-white py-3 rounded-lg font-semibold text-sm hover:bg-red-800 transition">
-                  Edit listing
+                <div className="text-center text-sm text-gray-500 py-2 bg-gray-50 rounded-lg">
+                  This is your listing
+                </div>
+                <Link to={`/listings/${listing.id}/edit`}
+                  className="block w-full text-center py-2.5 text-sm font-medium border border-gray-200 rounded-lg hover:bg-gray-50 transition">
+                  Edit Listing
                 </Link>
-                <button onClick={() => setShowDeleteConfirm(true)} disabled={manageLoading}
-                  className="w-full border border-red-100 text-red-700 bg-white py-3 rounded-lg font-semibold text-sm hover:bg-red-50 transition disabled:opacity-50">
-                  {manageLoading ? 'Deleting...' : 'Delete listing'}
-                </button>
               </div>
             ) : (
               <button onClick={handleContact} disabled={contacting}
-                className="w-full bg-red-700 text-white py-3 rounded-lg font-semibold text-sm hover:bg-red-800 transition disabled:opacity-50">
-                {contacting ? 'Opening chat...' : '💬 Contact Landlord'}
+                className="w-full bg-red-700 text-white py-3 rounded-lg font-semibold text-sm hover:bg-red-800 transition disabled:opacity-50 flex items-center justify-center gap-2">
+                {contacting ? <><span className="animate-spin">⏳</span> Opening chat...</> : '💬 Contact Landlord'}
               </button>
             )}
 
-            <ConfirmModal
-              isOpen={showDeleteConfirm}
-              title="Delete listing"
-              message="This action permanently deletes the listing and removes it from the platform."
-              confirmText="Delete listing"
-              cancelText="Keep listing"
-              loading={manageLoading}
-              onConfirm={handleDelete}
-              onCancel={() => setShowDeleteConfirm(false)}
-            />
-
             {!user && (
               <p className="text-xs text-gray-400 text-center mt-2">
-                <Link to="/signup" className="text-red-700 hover:underline">Sign up</Link> to message this landlord
+                <Link to="/signup" className="text-red-700 hover:underline font-medium">Sign up</Link> or{' '}
+                <Link to="/login" className="text-red-700 hover:underline font-medium">log in</Link> to message
               </p>
             )}
 
             <div className="mt-4 pt-4 border-t border-gray-100 text-xs text-gray-400 text-center space-y-1">
-              <p>👁 {listing.views || 0} views</p>
-              <p>Posted {new Date(listing.created_at).toLocaleDateString('en-CA')}</p>
+              <p>👁 {listing.views || 0} views · 📷 {images.length} photo{images.length !== 1 ? 's' : ''}</p>
+              <p>Listed {new Date(listing.created_at).toLocaleDateString('en-CA')}</p>
             </div>
           </div>
 
-          {/* Report listing */}
-          <button className="w-full text-xs text-gray-400 hover:text-gray-500 text-center py-2">
+          <button className="w-full text-xs text-gray-400 hover:text-gray-500 text-center py-2 transition">
             🚩 Report this listing
           </button>
         </div>

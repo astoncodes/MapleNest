@@ -46,7 +46,6 @@ const enrichUser = async (sessionUser) => {
     }
 
     const persistedRole = normalizeRole(profile.role)
-    const metadataRole = normalizeRole(sessionUser.user_metadata?.role)
     const role = profile.role === 'admin' ? 'admin' : (metadataRole === 'landlord' ? 'landlord' : persistedRole)
 
     if (profile.role !== role && profile.role !== 'admin') {
