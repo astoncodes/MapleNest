@@ -42,7 +42,7 @@ function AppRoutes() {
         } />
         <Route path="/listings/:id" element={<ListingDetailPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-<Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/create-listing" element={
           <LandlordRoute><CreateListingPage /></LandlordRoute>
         } />
