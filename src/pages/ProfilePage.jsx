@@ -113,7 +113,7 @@ export default function ProfilePage() {
   useEffect(() => {
     if (!viewingId) return
     fetchAll()
-  }, [viewingId])
+  }, [viewingId, user?.id])
 
   const fetchAll = async () => {
     setLoading(true)
@@ -443,12 +443,12 @@ export default function ProfilePage() {
                   <Link key={l.id} to={`/listings/${l.id}`}
                     className="flex items-center gap-3 p-3 rounded-lg border border-gray-100 hover:bg-gray-50 transition">
                     <div className="w-14 h-14 rounded-lg bg-gray-100 overflow-hidden flex-shrink-0">
-                      {img ? <img src={img.url} alt="" className="w-full h-full object-cover" /> :
+                      {img ? <img src={img.url} alt={l.title} className="w-full h-full object-cover" /> :
                         <div className="w-full h-full flex items-center justify-center text-gray-300 text-xl">🏠</div>}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-sm text-gray-800 truncate">{l.title}</p>
-                      <p className="text-xs text-gray-500">{l.city} · {l.property_type} · ${l.price}/mo</p>
+                      <p className="text-xs text-gray-500">{l.city} · {l.property_type?.charAt(0).toUpperCase() + l.property_type?.slice(1)} · ${Number(l.price).toLocaleString()}/mo</p>
                     </div>
                     <span className="text-red-500 text-lg">♥</span>
                   </Link>
