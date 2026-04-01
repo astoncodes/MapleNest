@@ -6,13 +6,13 @@ const TYPE_LABELS = {
   basement: 'Basement', condo: 'Condo', townhouse: 'Townhouse', sublease: 'Sublease'
 }
 
-function BarChart({ data, valueKey = 'count', labelKey = 'label', colorClass = 'bg-red-600' }) {
+function BarChart({ data, valueKey = 'count', labelKey = 'label', displayKey, colorClass = 'bg-red-600' }) {
   const max = Math.max(...data.map(d => d[valueKey]), 1)
   return (
     <div className="flex items-end gap-2 h-40">
       {data.map(item => (
         <div key={item[labelKey]} className="flex flex-col items-center gap-1 flex-1 min-w-0">
-          <span className="text-xs font-medium text-gray-700">{item[valueKey]}</span>
+          <span className="text-xs font-medium text-gray-700">{displayKey ? item[displayKey] : item[valueKey]}</span>
           <div className="w-full flex items-end" style={{ height: '120px' }}>
             <div
               className={`w-full ${colorClass} rounded-t transition-all`}
@@ -39,6 +39,7 @@ function StatCard({ label, value, sub }) {
 export default function AnalyticsPage() {
   const [listings, setListings] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
     let cancelled = false
@@ -46,9 +47,10 @@ export default function AnalyticsPage() {
       .from('listings')
       .select('price, city, property_type, bedrooms, created_at')
       .eq('status', 'active')
-      .then(({ data }) => {
+      .then(({ data, error: fetchError }) => {
         if (!cancelled) {
-          setListings(data || [])
+          if (fetchError) setError(fetchError.message)
+          else setListings(data || [])
           setLoading(false)
         }
       })
@@ -62,6 +64,13 @@ export default function AnalyticsPage() {
         {[...Array(4)].map((_, i) => <div key={i} className="h-24 bg-gray-200 rounded-xl" />)}
       </div>
       <div className="h-56 bg-gray-200 rounded-xl" />
+    </div>
+  )
+
+  if (error) return (
+    <div className="max-w-5xl mx-auto px-4 py-16 text-center">
+      <p className="text-red-600 font-medium">Failed to load analytics data.</p>
+      <p className="text-sm text-gray-400 mt-1">{error}</p>
     </div>
   )
 
@@ -89,11 +98,15 @@ export default function AnalyticsPage() {
   // Avg price by city
   const cityPriceMap = {}
   listings.forEach(l => {
+    if (!l.price || !l.city) return
     if (!cityPriceMap[l.city]) cityPriceMap[l.city] = []
     cityPriceMap[l.city].push(l.price)
   })
   const avgByCity = Object.entries(cityPriceMap)
-    .map(([label, arr]) => ({ label, count: Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) }))
+    .map(([label, arr]) => {
+      const avg = Math.round(arr.reduce((a, b) => a + b, 0) / arr.length)
+      return { label, count: avg, display: fmt(avg) }
+    })
     .sort((a, b) => b.count - a.count)
     .slice(0, 6)
 
@@ -149,7 +162,7 @@ export default function AnalyticsPage() {
 
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
           <h2 className="font-semibold text-gray-800 mb-4">Avg Rent by City</h2>
-          <BarChart data={avgByCity} valueKey="count" labelKey="label" colorClass="bg-amber-500" />
+          <BarChart data={avgByCity} valueKey="count" labelKey="label" displayKey="display" colorClass="bg-amber-500" />
         </div>
       </div>
     </div>
