@@ -6,6 +6,15 @@ const CITIES = ['All', 'Charlottetown', 'Summerside', 'Cornwall', 'Stratford', '
 const TYPES = ['All', 'apartment', 'house', 'room', 'basement', 'condo', 'townhouse']
 const TYPE_LABELS = { apartment: 'Apartment', house: 'House', room: 'Room', basement: 'Basement', condo: 'Condo', townhouse: 'Townhouse' }
 
+const timeAgo = (dateStr) => {
+  const days = Math.floor((Date.now() - new Date(dateStr)) / 86400000)
+  if (days === 0) return 'Today'
+  if (days === 1) return '1 day ago'
+  if (days < 30) return `${days} days ago`
+  const months = Math.floor(days / 30)
+  return months === 1 ? '1 month ago' : `${months} months ago`
+}
+
 function ListingCard({ listing }) {
   if (!listing) return null
   const image = listing.listing_images?.[0]?.url
@@ -49,6 +58,11 @@ function ListingCard({ listing }) {
           <span>🚿 {listing.bathrooms} bath</span>
           {listing.pet_friendly && <span>🐾 Pets ok</span>}
           {listing.parking_available && <span>🚗 Parking</span>}
+        </div>
+
+        <div className="flex items-center justify-between pt-2 mt-2 border-t border-gray-50 text-xs text-gray-400">
+          <span>Posted {timeAgo(listing.created_at)}</span>
+          {listing.views > 0 && <span>👁 {listing.views}</span>}
         </div>
       </div>
     </Link>
