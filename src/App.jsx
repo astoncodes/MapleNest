@@ -40,7 +40,7 @@ function AppRoutes() {
         <Route path="/listings" element={<ListingsPage />} />
         <Route path="/analytics" element={<AnalyticsPage />} />
         <Route path="/listings/:id/edit" element={
-          <LandlordRoute><EditListingPage /></LandlordRoute>
+          <ProtectedRoute><EditListingPage /></ProtectedRoute>
         } />
         <Route path="/listings/:id" element={<ListingDetailPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
