@@ -83,6 +83,7 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState(null)
   const [listings, setListings] = useState([])
   const [reviews, setReviews] = useState([])
+  const [savedListings, setSavedListings] = useState([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('overview')   // overview | listings | reviews | settings
 
@@ -116,16 +117,20 @@ export default function ProfilePage() {
 
   const fetchAll = async () => {
     setLoading(true)
-    const [{ data: prof }, { data: listData }, { data: revData }] = await Promise.all([
+    const [{ data: prof }, { data: listData }, { data: revData }, { data: savedData }] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', viewingId).single(),
       supabase.from('listings').select('id, title, city, property_type, status, price, created_at, listing_images(url, is_primary)')
         .eq('landlord_id', viewingId).eq('status', 'active').order('created_at', { ascending: false }),
       supabase.from('reviews').select('*, reviewer:reviewer_id(full_name, avatar_url, email)')
         .eq('reviewee_id', viewingId).order('created_at', { ascending: false }),
+      isOwn
+        ? supabase.from('saved_listings').select('listing_id, listings(id, title, city, property_type, price, created_at, listing_images(url, is_primary))').eq('user_id', viewingId).order('created_at', { ascending: false })
+        : Promise.resolve({ data: [] }),
     ])
     if (prof) { setProfile(prof); setEditForm({ full_name: prof.full_name || '', phone: prof.phone || '', bio: prof.bio || '' }) }
     setListings(listData || [])
     setReviews(revData || [])
+    setSavedListings((savedData || []).map(r => r.listings).filter(Boolean))
     if (user && revData) {
       setHasReviewed(revData.some(r => r.reviewer_id === user.id))
     }
@@ -218,7 +223,10 @@ export default function ProfilePage() {
     { key: 'overview', label: 'Overview' },
     { key: 'listings', label: `Listings (${listings.length})`, show: isLandlord },
     { key: 'reviews', label: `Reviews (${reviews.length})` },
-    ...(isOwn ? [{ key: 'settings', label: '⚙️ Settings' }] : []),
+    ...(isOwn ? [
+      { key: 'saved', label: `Saved (${savedListings.length})` },
+      { key: 'settings', label: '⚙️ Settings' },
+    ] : []),
   ].filter(t => t.show !== false)
 
   return (
@@ -418,6 +426,37 @@ export default function ProfilePage() {
             </Section>
           )}
         </div>
+      )}
+
+      {/* ── Saved tab (own profile only) ── */}
+      {tab === 'saved' && isOwn && (
+        <Section title="Saved Listings">
+          {savedListings.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-6">
+              No saved listings yet. Browse listings and click ♡ to save them.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {savedListings.map(l => {
+                const img = l.listing_images?.find(i => i.is_primary) || l.listing_images?.[0]
+                return (
+                  <Link key={l.id} to={`/listings/${l.id}`}
+                    className="flex items-center gap-3 p-3 rounded-lg border border-gray-100 hover:bg-gray-50 transition">
+                    <div className="w-14 h-14 rounded-lg bg-gray-100 overflow-hidden flex-shrink-0">
+                      {img ? <img src={img.url} alt="" className="w-full h-full object-cover" /> :
+                        <div className="w-full h-full flex items-center justify-center text-gray-300 text-xl">🏠</div>}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm text-gray-800 truncate">{l.title}</p>
+                      <p className="text-xs text-gray-500">{l.city} · {l.property_type} · ${l.price}/mo</p>
+                    </div>
+                    <span className="text-red-500 text-lg">♥</span>
+                  </Link>
+                )
+              })}
+            </div>
+          )}
+        </Section>
       )}
 
       {/* ── Settings tab (own profile only) ── */}
