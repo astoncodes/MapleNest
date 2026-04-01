@@ -7,7 +7,9 @@ const TYPES = ['All', 'apartment', 'house', 'room', 'basement', 'condo', 'townho
 const TYPE_LABELS = { apartment: 'Apartment', house: 'House', room: 'Room', basement: 'Basement', condo: 'Condo', townhouse: 'Townhouse' }
 
 const timeAgo = (dateStr) => {
+  if (!dateStr) return ''
   const days = Math.floor((Date.now() - new Date(dateStr)) / 86400000)
+  if (isNaN(days)) return ''
   if (days === 0) return 'Today'
   if (days === 1) return '1 day ago'
   if (days < 30) return `${days} days ago`
@@ -60,10 +62,12 @@ function ListingCard({ listing }) {
           {listing.parking_available && <span>🚗 Parking</span>}
         </div>
 
-        <div className="flex items-center justify-between pt-2 mt-2 border-t border-gray-50 text-xs text-gray-400">
-          <span>Posted {timeAgo(listing.created_at)}</span>
-          {listing.views > 0 && <span>👁 {listing.views}</span>}
-        </div>
+        {listing.created_at && (
+          <div className="flex items-center justify-between pt-2 mt-2 border-t border-gray-50 text-xs text-gray-400">
+            <span>Posted {timeAgo(listing.created_at)}</span>
+            {listing.views > 0 && <span>👁 {listing.views}</span>}
+          </div>
+        )}
       </div>
     </Link>
   )
