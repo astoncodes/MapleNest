@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS public.listings (
   landlord_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
   title TEXT NOT NULL,
   description TEXT,
-  property_type TEXT NOT NULL CHECK (property_type IN ('apartment', 'house', 'room', 'basement', 'condo', 'townhouse')),
+  property_type TEXT NOT NULL CHECK (property_type IN ('apartment', 'house', 'room', 'basement', 'condo', 'townhouse', 'sublease')),
   address TEXT,
   city TEXT NOT NULL DEFAULT 'Charlottetown',
   neighbourhood TEXT,

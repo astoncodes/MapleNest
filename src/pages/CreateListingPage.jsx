@@ -11,13 +11,18 @@ const PEI_NEIGHBOURHOODS = {
   Other: ['Other'],
 }
 
-const PROPERTY_TYPES = [
+const ALL_PROPERTY_TYPES = [
   { value: 'apartment', label: '🏢 Apartment' },
   { value: 'house', label: '🏠 House' },
   { value: 'room', label: '🛏 Room' },
   { value: 'basement', label: '🏚 Basement Suite' },
   { value: 'condo', label: '🏙 Condo' },
   { value: 'townhouse', label: '🏘 Townhouse' },
+  { value: 'sublease', label: '🔄 Sublease' },
+]
+
+const RENTER_PROPERTY_TYPES = [
+  { value: 'sublease', label: '🔄 Sublease' },
 ]
 
 const LEASE_TERMS = [
@@ -28,7 +33,9 @@ const LEASE_TERMS = [
 ]
 
 export default function CreateListingPage() {
-  const { user } = useAuth()
+  const { user, role } = useAuth()
+  const isRenter = role === 'renter'
+  const PROPERTY_TYPES = isRenter ? RENTER_PROPERTY_TYPES : ALL_PROPERTY_TYPES
   const navigate = useNavigate()
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
@@ -41,7 +48,7 @@ export default function CreateListingPage() {
   const [form, setForm] = useState({
     title: '',
     description: '',
-    property_type: '',
+    property_type: role === 'renter' ? 'sublease' : '',
     city: 'Charlottetown',
     neighbourhood: '',
     address: '',
@@ -216,8 +223,12 @@ export default function CreateListingPage() {
   return (
     <div className="max-w-2xl mx-auto px-4 py-10">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Post a Listing</h1>
-        <p className="text-gray-500 text-sm mt-1">Fill in your property details to connect with renters</p>
+        <h1 className="text-2xl font-bold text-gray-900">{isRenter ? 'Post a Sublease' : 'Post a Listing'}</h1>
+        <p className="text-gray-500 text-sm mt-1">
+          {isRenter
+            ? 'List your space for sublet and find someone to take over your lease'
+            : 'Fill in your property details to connect with renters'}
+        </p>
       </div>
 
       {/* Step indicator */}

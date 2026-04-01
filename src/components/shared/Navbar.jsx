@@ -27,12 +27,17 @@ export default function Navbar() {
           </Link>
           {user ? (
             <>
-              {isLandlord && (
+              {isLandlord ? (
                 <Link to="/create-listing"
                   className="bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-800 transition">
                   + Post Listing
                 </Link>
-              )}
+              ) : user ? (
+                <Link to="/create-listing"
+                  className="bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-800 transition">
+                  + Post Sublease
+                </Link>
+              ) : null}
               <Link to="/profile" className="text-gray-600 hover:text-gray-900 text-sm">Profile</Link>
               <button onClick={handleSignOut} className="text-gray-400 hover:text-gray-600 text-sm">Sign Out</button>
             </>

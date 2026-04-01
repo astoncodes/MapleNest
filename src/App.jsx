@@ -46,7 +46,7 @@ function AppRoutes() {
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/create-listing" element={
-          <LandlordRoute><CreateListingPage /></LandlordRoute>
+          <ProtectedRoute><CreateListingPage /></ProtectedRoute>
         } />
         <Route path="/profile" element={
           <ProtectedRoute><ProfilePage /></ProtectedRoute>
