@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
+import { useSavedListings } from '../hooks/useSavedListings'
 
 const TYPE_LABELS = {
   apartment: 'Apartment', house: 'House', room: 'Room',
@@ -159,6 +160,7 @@ export default function ListingDetailPage() {
   const [landlord, setLandlord] = useState(null)
   const [loading, setLoading] = useState(true)
   const [contacting, setContacting] = useState(false)
+  const { isSaved, toggleSave } = useSavedListings()
   const [contactError, setContactError] = useState(null)
 
   useEffect(() => {
@@ -360,6 +362,21 @@ export default function ListingDetailPage() {
               <div className="text-3xl font-bold text-red-700">{formatPrice(listing.price)}</div>
               <div className="text-xs text-gray-400 mt-0.5">per month</div>
             </div>
+
+            {user && !isOwnListing && (
+              <button
+                onClick={() => toggleSave(listing.id)}
+                aria-label={isSaved(listing.id) ? 'Unsave listing' : 'Save listing'}
+                className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border text-sm font-medium transition mb-3 ${
+                  isSaved(listing.id)
+                    ? 'border-red-200 text-red-700 bg-red-50 hover:bg-red-100'
+                    : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                <span>{isSaved(listing.id) ? '♥' : '♡'}</span>
+                {isSaved(listing.id) ? 'Saved' : 'Save Listing'}
+              </button>
+            )}
 
             {contactError && (
               <div className="bg-red-50 text-red-700 text-xs px-3 py-2 rounded-lg mb-3 border border-red-100">
