@@ -5,8 +5,8 @@ import { useAuth } from '../hooks/useAuth'
 import { useSavedListings } from '../hooks/useSavedListings'
 
 const CITIES = ['All', 'Charlottetown', 'Summerside', 'Cornwall', 'Stratford', 'Other']
-const TYPES = ['All', 'apartment', 'house', 'room', 'basement', 'condo', 'townhouse']
-const TYPE_LABELS = { apartment: 'Apartment', house: 'House', room: 'Room', basement: 'Basement', condo: 'Condo', townhouse: 'Townhouse' }
+const TYPES = ['All', 'apartment', 'house', 'room', 'basement', 'condo', 'townhouse', 'sublease']
+const TYPE_LABELS = { apartment: 'Apartment', house: 'House', room: 'Room', basement: 'Basement', condo: 'Condo', townhouse: 'Townhouse', sublease: 'Sublease' }
 
 const timeAgo = (dateStr) => {
   if (!dateStr) return ''

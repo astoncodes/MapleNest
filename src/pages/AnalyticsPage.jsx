@@ -41,6 +41,8 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
+  const fmt = (n) => `$${Number(n).toLocaleString()}`
+
   useEffect(() => {
     let cancelled = false
     supabase
@@ -123,8 +125,6 @@ export default function AnalyticsPage() {
     label: b.label,
     count: prices.filter(p => p >= b.min && p < b.max).length,
   }))
-
-  const fmt = (n) => `$${Number(n).toLocaleString()}`
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">

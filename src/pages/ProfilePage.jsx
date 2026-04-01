@@ -117,24 +117,27 @@ export default function ProfilePage() {
 
   const fetchAll = async () => {
     setLoading(true)
-    const [{ data: prof }, { data: listData }, { data: revData }, { data: savedData }] = await Promise.all([
-      supabase.from('profiles').select('*').eq('id', viewingId).single(),
-      supabase.from('listings').select('id, title, city, property_type, status, price, created_at, listing_images(url, is_primary)')
-        .eq('landlord_id', viewingId).eq('status', 'active').order('created_at', { ascending: false }),
-      supabase.from('reviews').select('*, reviewer:reviewer_id(full_name, avatar_url, email)')
-        .eq('reviewee_id', viewingId).order('created_at', { ascending: false }),
-      isOwn
-        ? supabase.from('saved_listings').select('listing_id, listings(id, title, city, property_type, price, created_at, listing_images(url, is_primary))').eq('user_id', viewingId).order('created_at', { ascending: false })
-        : Promise.resolve({ data: [] }),
-    ])
-    if (prof) { setProfile(prof); setEditForm({ full_name: prof.full_name || '', phone: prof.phone || '', bio: prof.bio || '' }) }
-    setListings(listData || [])
-    setReviews(revData || [])
-    setSavedListings((savedData || []).map(r => r.listings).filter(Boolean))
-    if (user && revData) {
-      setHasReviewed(revData.some(r => r.reviewer_id === user.id))
+    try {
+      const [{ data: prof }, { data: listData }, { data: revData }, { data: savedData }] = await Promise.all([
+        supabase.from('profiles').select('*').eq('id', viewingId).single(),
+        supabase.from('listings').select('id, title, city, property_type, status, price, created_at, listing_images(url, is_primary)')
+          .eq('landlord_id', viewingId).eq('status', 'active').order('created_at', { ascending: false }),
+        supabase.from('reviews').select('*, reviewer:reviewer_id(full_name, avatar_url, email)')
+          .eq('reviewee_id', viewingId).order('created_at', { ascending: false }),
+        isOwn
+          ? supabase.from('saved_listings').select('listing_id, listings(id, title, city, property_type, price, created_at, listing_images(url, is_primary))').eq('user_id', viewingId).order('created_at', { ascending: false })
+          : Promise.resolve({ data: [] }),
+      ])
+      if (prof) { setProfile(prof); setEditForm({ full_name: prof.full_name || '', phone: prof.phone || '', bio: prof.bio || '' }) }
+      setListings(listData || [])
+      setReviews(revData || [])
+      setSavedListings((savedData || []).map(r => r.listings).filter(Boolean))
+      if (user && revData) {
+        setHasReviewed(revData.some(r => r.reviewer_id === user.id))
+      }
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   // ── Save profile edits ───────────────────────────────────────────────────
