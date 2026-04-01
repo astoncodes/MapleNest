@@ -11,6 +11,7 @@ import EditListingPage from './pages/EditListingPage'
 import ProfilePage from './pages/ProfilePage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
+import AnalyticsPage from './pages/AnalyticsPage'
 
 
 function ProtectedRoute({ children }) {
@@ -37,6 +38,7 @@ function AppRoutes() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/listings" element={<ListingsPage />} />
+        <Route path="/analytics" element={<AnalyticsPage />} />
         <Route path="/listings/:id/edit" element={
           <LandlordRoute><EditListingPage /></LandlordRoute>
         } />

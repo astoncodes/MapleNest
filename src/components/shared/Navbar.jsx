@@ -22,6 +22,9 @@ export default function Navbar() {
           <Link to="/listings" className="text-gray-600 hover:text-gray-900 text-sm font-medium">
             Browse Listings
           </Link>
+          <Link to="/analytics" className="text-gray-600 hover:text-gray-900 text-sm font-medium">
+            Analytics
+          </Link>
           {user ? (
             <>
               {isLandlord && (
