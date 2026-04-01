@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../hooks/useAuth'
+import { useSavedListings } from '../hooks/useSavedListings'
 
 const CITIES = ['All', 'Charlottetown', 'Summerside', 'Cornwall', 'Stratford', 'Other']
 const TYPES = ['All', 'apartment', 'house', 'room', 'basement', 'condo', 'townhouse']
@@ -17,7 +19,7 @@ const timeAgo = (dateStr) => {
   return months === 1 ? '1 month ago' : `${months} months ago`
 }
 
-function ListingCard({ listing }) {
+function ListingCard({ listing, isSaved, onToggleSave }) {
   if (!listing) return null
   const image = listing.listing_images?.[0]?.url
   const formatPrice = (p) => `$${Number(p || 0).toLocaleString()}`
@@ -36,9 +38,18 @@ function ListingCard({ listing }) {
           {TYPE_LABELS[listing.property_type] || listing.property_type}
         </div>
         {listing.utilities_included && (
-          <div className="absolute top-2 right-2 bg-green-500 text-white text-xs font-medium px-2 py-1 rounded-full shadow-sm">
+          <div className="absolute bottom-2 left-2 bg-green-500 text-white text-xs font-medium px-2 py-1 rounded-full shadow-sm">
             Utilities incl.
           </div>
+        )}
+        {onToggleSave && (
+          <button
+            onClick={e => { e.preventDefault(); e.stopPropagation(); onToggleSave(listing.id) }}
+            className="absolute top-2 right-2 w-8 h-8 flex items-center justify-center rounded-full bg-white shadow-sm hover:scale-110 transition-transform"
+            title={isSaved ? 'Unsave' : 'Save listing'}
+          >
+            <span className={isSaved ? 'text-red-600' : 'text-gray-300'}>{isSaved ? '♥' : '♡'}</span>
+          </button>
         )}
       </div>
 
@@ -90,6 +101,9 @@ export default function ListingsPage() {
     parking: false,
     utilitiesIncluded: false,
   })
+
+  const { user } = useAuth()
+  const { isSaved, toggleSave } = useSavedListings()
 
   const updateFilter = (key, value) => setFilters(prev => ({ ...prev, [key]: value }))
 
@@ -329,7 +343,12 @@ export default function ListingsPage() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {listings.map(listing => (
-                <ListingCard key={listing.id} listing={listing} />
+                <ListingCard
+                  key={listing.id}
+                  listing={listing}
+                  isSaved={user ? isSaved(listing.id) : false}
+                  onToggleSave={user ? toggleSave : null}
+                />
               ))}
             </div>
           )}
