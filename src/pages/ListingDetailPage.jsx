@@ -242,6 +242,7 @@ export default function ListingDetailPage() {
 
   const images = listing.listing_images || []
   const isOwnListing = user?.id === listing.landlord_id
+  const saved = isSaved(listing.id)
   const formatPrice = p => `$${p.toLocaleString()}`
   const formatDate = d => d
     ? new Date(d).toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric' })
@@ -366,15 +367,15 @@ export default function ListingDetailPage() {
             {user && !isOwnListing && (
               <button
                 onClick={() => toggleSave(listing.id)}
-                aria-label={isSaved(listing.id) ? 'Unsave listing' : 'Save listing'}
+                aria-label={saved ? 'Unsave listing' : 'Save listing'}
                 className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border text-sm font-medium transition mb-3 ${
-                  isSaved(listing.id)
+                  saved
                     ? 'border-red-200 text-red-700 bg-red-50 hover:bg-red-100'
                     : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                 }`}
               >
-                <span>{isSaved(listing.id) ? '♥' : '♡'}</span>
-                {isSaved(listing.id) ? 'Saved' : 'Save Listing'}
+                <span>{saved ? '♥' : '♡'}</span>
+                {saved ? 'Saved' : 'Save Listing'}
               </button>
             )}
 
