@@ -71,6 +71,14 @@ CREATE TABLE IF NOT EXISTS public.listing_images (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS public.saved_listings (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  listing_id UUID REFERENCES public.listings(id) ON DELETE CASCADE NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, listing_id)
+);
+
 CREATE TABLE IF NOT EXISTS public.conversations (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   listing_id UUID REFERENCES public.listings(id) ON DELETE SET NULL,
@@ -121,6 +129,7 @@ CREATE TABLE IF NOT EXISTS public.reports (
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.listings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.listing_images ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.saved_listings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.conversations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.reviews ENABLE ROW LEVEL SECURITY;
@@ -140,6 +149,7 @@ BEGIN
         'profiles',
         'listings',
         'listing_images',
+        'saved_listings',
         'conversations',
         'messages',
         'reviews',
@@ -228,6 +238,19 @@ CREATE POLICY "Landlords can manage own listing images" ON public.listing_images
     )
   );
 
+DROP POLICY IF EXISTS "Users can view their own saved listings" ON public.saved_listings;
+DROP POLICY IF EXISTS "Users can save listings" ON public.saved_listings;
+DROP POLICY IF EXISTS "Users can unsave listings" ON public.saved_listings;
+CREATE POLICY "Users can view their own saved listings" ON public.saved_listings
+  FOR SELECT
+  USING (auth.uid() = user_id);
+CREATE POLICY "Users can save listings" ON public.saved_listings
+  FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can unsave listings" ON public.saved_listings
+  FOR DELETE
+  USING (auth.uid() = user_id);
+
 DROP POLICY IF EXISTS "Conversation participants can view" ON public.conversations;
 DROP POLICY IF EXISTS "Renters can create conversations" ON public.conversations;
 CREATE POLICY "Conversation participants can view" ON public.conversations
@@ -314,3 +337,7 @@ CREATE INDEX IF NOT EXISTS idx_listings_landlord_id
   ON public.listings (landlord_id);
 CREATE INDEX IF NOT EXISTS idx_listings_city_status
   ON public.listings (city, status);
+CREATE INDEX IF NOT EXISTS saved_listings_user_id_idx
+  ON public.saved_listings(user_id);
+CREATE INDEX IF NOT EXISTS saved_listings_listing_id_idx
+  ON public.saved_listings(listing_id);
