@@ -27,6 +27,7 @@ export default function ConversationPage() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const [conversation, setConversation] = useState(null)
+  const conversationRef = useRef(null)
   const [messages, setMessages] = useState([])
   const [newMessage, setNewMessage] = useState('')
   const [loading, setLoading] = useState(true)
@@ -34,6 +35,10 @@ export default function ConversationPage() {
   const [error, setError] = useState(null)
   const bottomRef = useRef(null)
   const inputRef = useRef(null)
+
+  useEffect(() => {
+    conversationRef.current = conversation
+  }, [conversation])
 
   useEffect(() => {
     if (user) fetchConversation()
@@ -64,6 +69,13 @@ export default function ConversationPage() {
             setMessages(prev => [...prev, msg])
             // Mark as read immediately since user is viewing
             supabase.from('messages').update({ read: true }).eq('id', msg.id)
+            // Decrement our unread counter since we're actively viewing
+            const convo = conversationRef.current
+            if (convo) {
+              const myUnreadField = user.id === convo.renter_id ? 'renter_unread' : 'landlord_unread'
+              supabase.from('conversations').update({ [myUnreadField]: 0 }).eq('id', convo.id)
+              setConversation(prev => prev ? { ...prev, [myUnreadField]: 0 } : prev)
+            }
           }
         }
       )
@@ -151,6 +163,9 @@ export default function ConversationPage() {
       last_message_at: new Date().toISOString(),
       [otherUnreadField]: currentOtherUnread + 1,
     }).eq('id', id)
+
+    // Keep local conversation state current so next send reads correct unread count
+    setConversation(prev => prev ? { ...prev, [otherUnreadField]: currentOtherUnread + 1 } : prev)
 
     setSending(false)
     inputRef.current?.focus()
