@@ -19,7 +19,7 @@ export default function EditListingPage() {
     const fetchListing = async () => {
       const { data, error } = await supabase
         .from('listings')
-        .select('*')
+        .select('*, listing_images(id, url, is_primary, sort_order, storage_path)')
         .eq('id', id)
         .single()
 
