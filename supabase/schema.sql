@@ -190,7 +190,9 @@ CREATE POLICY "Users can insert own profile" ON public.profiles
 
 DROP POLICY IF EXISTS "Listings are publicly viewable" ON public.listings;
 DROP POLICY IF EXISTS "Landlords can create listings" ON public.listings;
+DROP POLICY IF EXISTS "Renters can post subleases" ON public.listings;
 DROP POLICY IF EXISTS "Landlords can update own listings" ON public.listings;
+DROP POLICY IF EXISTS "Renters can update own subleases" ON public.listings;
 DROP POLICY IF EXISTS "Landlords can delete own listings" ON public.listings;
 CREATE POLICY "Listings are publicly viewable" ON public.listings
   FOR SELECT USING (status = 'active');
@@ -198,6 +200,12 @@ CREATE POLICY "Landlords can create listings" ON public.listings
   FOR INSERT WITH CHECK (
     auth.uid() = landlord_id
     AND public.is_landlord(auth.uid())
+  );
+CREATE POLICY "Renters can post subleases" ON public.listings
+  FOR INSERT WITH CHECK (
+    auth.uid() = landlord_id
+    AND property_type = 'sublease'
+    AND NOT public.is_landlord(auth.uid())
   );
 CREATE POLICY "Landlords can update own listings" ON public.listings
   FOR UPDATE USING (
@@ -208,6 +216,17 @@ CREATE POLICY "Landlords can update own listings" ON public.listings
     auth.uid() = landlord_id
     AND public.is_landlord(auth.uid())
   );
+CREATE POLICY "Renters can update own subleases" ON public.listings
+  FOR UPDATE USING (
+    auth.uid() = landlord_id
+    AND property_type = 'sublease'
+    AND NOT public.is_landlord(auth.uid())
+  )
+  WITH CHECK (
+    auth.uid() = landlord_id
+    AND property_type = 'sublease'
+    AND NOT public.is_landlord(auth.uid())
+  );
 CREATE POLICY "Landlords can delete own listings" ON public.listings
   FOR DELETE USING (
     auth.uid() = landlord_id
@@ -216,6 +235,7 @@ CREATE POLICY "Landlords can delete own listings" ON public.listings
 
 DROP POLICY IF EXISTS "Images are publicly viewable" ON public.listing_images;
 DROP POLICY IF EXISTS "Landlords can manage own listing images" ON public.listing_images;
+DROP POLICY IF EXISTS "Renters can manage own sublease images" ON public.listing_images;
 CREATE POLICY "Images are publicly viewable" ON public.listing_images
   FOR SELECT USING (true);
 CREATE POLICY "Landlords can manage own listing images" ON public.listing_images
@@ -235,6 +255,27 @@ CREATE POLICY "Landlords can manage own listing images" ON public.listing_images
       WHERE l.id = listing_id
         AND l.landlord_id = auth.uid()
         AND public.is_landlord(auth.uid())
+    )
+  );
+CREATE POLICY "Renters can manage own sublease images" ON public.listing_images
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1
+      FROM public.listings l
+      WHERE l.id = listing_id
+        AND l.landlord_id = auth.uid()
+        AND l.property_type = 'sublease'
+        AND NOT public.is_landlord(auth.uid())
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM public.listings l
+      WHERE l.id = listing_id
+        AND l.landlord_id = auth.uid()
+        AND l.property_type = 'sublease'
+        AND NOT public.is_landlord(auth.uid())
     )
   );
 
@@ -295,6 +336,13 @@ CREATE POLICY "Participants can mark messages read" ON public.messages
       WHERE c.id = conversation_id
         AND (c.renter_id = auth.uid() OR c.landlord_id = auth.uid())
     )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.conversations c
+      WHERE c.id = conversation_id
+        AND (c.renter_id = auth.uid() OR c.landlord_id = auth.uid())
+    )
   );
 
 DROP POLICY IF EXISTS "Authenticated users can submit reports" ON public.reports;
@@ -346,6 +394,23 @@ CREATE TRIGGER profiles_updated_at
   BEFORE UPDATE ON public.profiles
   FOR EACH ROW
   EXECUTE FUNCTION public.handle_updated_at();
+
+-- =============================================
+-- FUNCTIONS
+-- =============================================
+
+-- Atomically increment view count — bypasses RLS so all viewers (including anon) can increment.
+-- Use SECURITY DEFINER with pinned search_path to prevent search-path injection.
+CREATE OR REPLACE FUNCTION public.increment_views(p_listing_id uuid)
+RETURNS void
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  UPDATE public.listings SET views = views + 1 WHERE id = p_listing_id;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.increment_views(uuid) TO authenticated, anon;
 
 -- =============================================
 -- INDEXES

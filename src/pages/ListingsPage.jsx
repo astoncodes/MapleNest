@@ -152,7 +152,7 @@ export default function ListingsPage() {
       query = query.eq('utilities_included', true);
 
     if (queryFromParams?.trim()) {
-      const q = queryFromParams.trim().replace(/[(),%]/g, ' ');
+      const q = queryFromParams.trim().replace(/[(),%_]/g, ' ');
       query = query.or(`title.ilike.%${q}%,neighbourhood.ilike.%${q}%,description.ilike.%${q}%`);
     }
 

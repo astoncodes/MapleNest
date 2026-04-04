@@ -18,4 +18,11 @@ CREATE POLICY "Participants can mark messages read" ON public.messages
       WHERE c.id = conversation_id
         AND (c.renter_id = auth.uid() OR c.landlord_id = auth.uid())
     )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.conversations c
+      WHERE c.id = conversation_id
+        AND (c.renter_id = auth.uid() OR c.landlord_id = auth.uid())
+    )
   );

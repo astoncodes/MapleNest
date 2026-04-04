@@ -105,13 +105,19 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
     const newFiles = Array.from(e.target.files)
     const maxNew = Math.max(0, 8 - existingImages.length)
     const combined = [...photos, ...newFiles].slice(0, maxNew)
+    // Revoke URLs for any existing photos that got cut off by the cap
+    photoPreviewUrls.slice(maxNew).forEach(url => URL.revokeObjectURL(url))
+    // Keep existing URLs for photos we're keeping; create new URLs only for added files
+    const keptUrls = photoPreviewUrls.slice(0, Math.min(photos.length, maxNew))
+    const addedUrls = combined.slice(photos.length).map(f => URL.createObjectURL(f))
     setPhotos(combined)
-    setPhotoPreviewUrls(combined.map(f => URL.createObjectURL(f)))
+    setPhotoPreviewUrls([...keptUrls, ...addedUrls])
     // Reset input so same file can be re-added if needed
     e.target.value = ''
   }
 
   const removePhoto = (index) => {
+    URL.revokeObjectURL(photoPreviewUrls[index])
     const updatedPhotos = photos.filter((_, i) => i !== index)
     const updatedUrls = photoPreviewUrls.filter((_, i) => i !== index)
     setPhotos(updatedPhotos)
