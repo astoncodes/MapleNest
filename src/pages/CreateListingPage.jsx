@@ -43,6 +43,7 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
   const [uploadProgress, setUploadProgress] = useState(null)
   const [existingImages, setExistingImages] = useState([])
   const [removedImageIds, setRemovedImageIds] = useState([])
+  const [removedImagePaths, setRemovedImagePaths] = useState([])
 
   const [photos, setPhotos] = useState([])           // File objects
   const [photoPreviewUrls, setPhotoPreviewUrls] = useState([])
@@ -102,7 +103,8 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
 
   const handlePhotos = (e) => {
     const newFiles = Array.from(e.target.files)
-    const combined = [...photos, ...newFiles].slice(0, 8)
+    const maxNew = Math.max(0, 8 - existingImages.length)
+    const combined = [...photos, ...newFiles].slice(0, maxNew)
     setPhotos(combined)
     setPhotoPreviewUrls(combined.map(f => URL.createObjectURL(f)))
     // Reset input so same file can be re-added if needed
@@ -128,8 +130,10 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
   }
 
   const removeExistingImage = (imgId) => {
+    const img = existingImages.find(i => i.id === imgId)
     setRemovedImageIds(prev => [...prev, imgId])
-    setExistingImages(prev => prev.filter(img => img.id !== imgId))
+    if (img?.storage_path) setRemovedImagePaths(prev => [...prev, img.storage_path])
+    setExistingImages(prev => prev.filter(i => i.id !== imgId))
   }
 
   const uploadPhotos = async (listingId, sortOffset = 0) => {
@@ -229,9 +233,12 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
         if (updateError) throw updateError
         listingId = listing.id
 
-        // Delete any images the user removed
+        // Delete removed images from DB and storage
         if (removedImageIds.length > 0) {
           await supabase.from('listing_images').delete().in('id', removedImageIds)
+          if (removedImagePaths.length > 0) {
+            await supabase.storage.from('listing-images').remove(removedImagePaths)
+          }
         }
       } else {
         const { data, error: insertError } = await supabase
@@ -539,7 +546,7 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
 
             {/* Upload area */}
             <label className={`block border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition ${
-              photos.length >= 8
+              photos.length + existingImages.length >= 8
                 ? 'border-gray-100 bg-gray-50 cursor-not-allowed'
                 : 'border-gray-200 hover:border-red-300 hover:bg-red-50'
             }`}>
@@ -548,15 +555,15 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
                 accept="image/jpeg,image/png,image/webp,image/heic"
                 multiple
                 className="hidden"
-                disabled={photos.length >= 8}
+                disabled={photos.length + existingImages.length >= 8}
                 onChange={handlePhotos}
               />
               <div className="text-3xl mb-2">📷</div>
               <p className="text-sm font-medium text-gray-700">
-                {photos.length >= 8 ? 'Maximum 8 photos reached' : 'Click to add photos'}
+                {photos.length + existingImages.length >= 8 ? 'Maximum 8 photos reached' : 'Click to add photos'}
               </p>
               <p className="text-xs text-gray-400 mt-1">
-                JPG, PNG, WebP — max 10MB each · {photos.length}/8 added
+                JPG, PNG, WebP — max 10MB each · {photos.length + existingImages.length}/8 added
               </p>
             </label>
 
@@ -634,7 +641,7 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
             <button onClick={handleSubmit} disabled={loading}
               className="px-6 py-2.5 text-sm font-semibold bg-red-700 text-white rounded-lg hover:bg-red-800 transition disabled:opacity-50 flex items-center gap-2">
               {loading ? (
-                <><span className="animate-spin">⏳</span> {uploadProgress || 'Publishing...'}</>
+                <><span className="animate-spin">⏳</span> {uploadProgress || (mode === 'edit' ? 'Saving...' : 'Publishing...')}</>
               ) : (
                 mode === 'edit' ? '✓ Save Changes' : '🍁 Publish Listing'
               )}
