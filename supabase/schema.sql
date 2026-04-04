@@ -190,7 +190,9 @@ CREATE POLICY "Users can insert own profile" ON public.profiles
 
 DROP POLICY IF EXISTS "Listings are publicly viewable" ON public.listings;
 DROP POLICY IF EXISTS "Landlords can create listings" ON public.listings;
+DROP POLICY IF EXISTS "Renters can post subleases" ON public.listings;
 DROP POLICY IF EXISTS "Landlords can update own listings" ON public.listings;
+DROP POLICY IF EXISTS "Renters can update own subleases" ON public.listings;
 DROP POLICY IF EXISTS "Landlords can delete own listings" ON public.listings;
 CREATE POLICY "Listings are publicly viewable" ON public.listings
   FOR SELECT USING (status = 'active');
@@ -198,6 +200,12 @@ CREATE POLICY "Landlords can create listings" ON public.listings
   FOR INSERT WITH CHECK (
     auth.uid() = landlord_id
     AND public.is_landlord(auth.uid())
+  );
+CREATE POLICY "Renters can post subleases" ON public.listings
+  FOR INSERT WITH CHECK (
+    auth.uid() = landlord_id
+    AND property_type = 'sublease'
+    AND NOT public.is_landlord(auth.uid())
   );
 CREATE POLICY "Landlords can update own listings" ON public.listings
   FOR UPDATE USING (
@@ -208,6 +216,17 @@ CREATE POLICY "Landlords can update own listings" ON public.listings
     auth.uid() = landlord_id
     AND public.is_landlord(auth.uid())
   );
+CREATE POLICY "Renters can update own subleases" ON public.listings
+  FOR UPDATE USING (
+    auth.uid() = landlord_id
+    AND property_type = 'sublease'
+    AND NOT public.is_landlord(auth.uid())
+  )
+  WITH CHECK (
+    auth.uid() = landlord_id
+    AND property_type = 'sublease'
+    AND NOT public.is_landlord(auth.uid())
+  );
 CREATE POLICY "Landlords can delete own listings" ON public.listings
   FOR DELETE USING (
     auth.uid() = landlord_id
@@ -216,6 +235,7 @@ CREATE POLICY "Landlords can delete own listings" ON public.listings
 
 DROP POLICY IF EXISTS "Images are publicly viewable" ON public.listing_images;
 DROP POLICY IF EXISTS "Landlords can manage own listing images" ON public.listing_images;
+DROP POLICY IF EXISTS "Renters can manage own sublease images" ON public.listing_images;
 CREATE POLICY "Images are publicly viewable" ON public.listing_images
   FOR SELECT USING (true);
 CREATE POLICY "Landlords can manage own listing images" ON public.listing_images
@@ -237,6 +257,27 @@ CREATE POLICY "Landlords can manage own listing images" ON public.listing_images
         AND public.is_landlord(auth.uid())
     )
   );
+CREATE POLICY "Renters can manage own sublease images" ON public.listing_images
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1
+      FROM public.listings l
+      WHERE l.id = listing_id
+        AND l.landlord_id = auth.uid()
+        AND l.property_type = 'sublease'
+        AND NOT public.is_landlord(auth.uid())
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM public.listings l
+      WHERE l.id = listing_id
+        AND l.landlord_id = auth.uid()
+        AND l.property_type = 'sublease'
+        AND NOT public.is_landlord(auth.uid())
+    )
+  );
 
 DROP POLICY IF EXISTS "Users can view their own saved listings" ON public.saved_listings;
 DROP POLICY IF EXISTS "Users can save listings" ON public.saved_listings;
@@ -253,15 +294,21 @@ CREATE POLICY "Users can unsave listings" ON public.saved_listings
 
 DROP POLICY IF EXISTS "Conversation participants can view" ON public.conversations;
 DROP POLICY IF EXISTS "Renters can create conversations" ON public.conversations;
+DROP POLICY IF EXISTS "Participants can update conversation" ON public.conversations;
 CREATE POLICY "Conversation participants can view" ON public.conversations
   FOR SELECT
   USING (auth.uid() = renter_id OR auth.uid() = landlord_id);
 CREATE POLICY "Renters can create conversations" ON public.conversations
   FOR INSERT
   WITH CHECK (auth.uid() = renter_id);
+CREATE POLICY "Participants can update conversation" ON public.conversations
+  FOR UPDATE
+  USING (auth.uid() = renter_id OR auth.uid() = landlord_id)
+  WITH CHECK (auth.uid() = renter_id OR auth.uid() = landlord_id);
 
 DROP POLICY IF EXISTS "Participants can view messages" ON public.messages;
 DROP POLICY IF EXISTS "Participants can send messages" ON public.messages;
+DROP POLICY IF EXISTS "Participants can mark messages read" ON public.messages;
 CREATE POLICY "Participants can view messages" ON public.messages
   FOR SELECT
   USING (
@@ -281,6 +328,27 @@ CREATE POLICY "Participants can send messages" ON public.messages
         AND (c.renter_id = auth.uid() OR c.landlord_id = auth.uid())
     )
   );
+CREATE POLICY "Participants can mark messages read" ON public.messages
+  FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.conversations c
+      WHERE c.id = conversation_id
+        AND (c.renter_id = auth.uid() OR c.landlord_id = auth.uid())
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.conversations c
+      WHERE c.id = conversation_id
+        AND (c.renter_id = auth.uid() OR c.landlord_id = auth.uid())
+    )
+  );
+
+DROP POLICY IF EXISTS "Authenticated users can submit reports" ON public.reports;
+CREATE POLICY "Authenticated users can submit reports" ON public.reports
+  FOR INSERT
+  WITH CHECK (auth.uid() = reporter_id);
 
 -- =============================================
 -- TRIGGERS
@@ -326,6 +394,23 @@ CREATE TRIGGER profiles_updated_at
   BEFORE UPDATE ON public.profiles
   FOR EACH ROW
   EXECUTE FUNCTION public.handle_updated_at();
+
+-- =============================================
+-- FUNCTIONS
+-- =============================================
+
+-- Atomically increment view count — bypasses RLS so all viewers (including anon) can increment.
+-- Use SECURITY DEFINER with pinned search_path to prevent search-path injection.
+CREATE OR REPLACE FUNCTION public.increment_views(p_listing_id uuid)
+RETURNS void
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  UPDATE public.listings SET views = views + 1 WHERE id = p_listing_id;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.increment_views(uuid) TO authenticated, anon;
 
 -- =============================================
 -- INDEXES

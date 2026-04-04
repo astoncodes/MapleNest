@@ -162,6 +162,12 @@ export default function ListingDetailPage() {
   const [contacting, setContacting] = useState(false)
   const { isSaved, toggleSave } = useSavedListings()
   const [contactError, setContactError] = useState(null)
+  const [reportOpen, setReportOpen] = useState(false)
+  const [reportReason, setReportReason] = useState('')
+  const [reportDetails, setReportDetails] = useState('')
+  const [reportSubmitting, setReportSubmitting] = useState(false)
+  const [reportDone, setReportDone] = useState(false)
+  const [reportError, setReportError] = useState(null)
 
   useEffect(() => {
     fetchListing()
@@ -196,8 +202,8 @@ export default function ListingDetailPage() {
     setLandlord(profile)
     setLoading(false)
 
-    // Increment view count (fire and forget)
-    supabase.from('listings').update({ views: (data.views || 0) + 1 }).eq('id', id)
+    // Atomic increment — avoids race condition under concurrent views
+    supabase.rpc('increment_views', { p_listing_id: id })
   }
 
   const handleContact = async () => {
@@ -229,6 +235,25 @@ export default function ListingDetailPage() {
       setContactError('Could not start conversation. Please try again.')
     } finally {
       setContacting(false)
+    }
+  }
+
+  const handleReport = async () => {
+    if (!reportReason) return
+    setReportSubmitting(true)
+    setReportError(null)
+    const { error } = await supabase.from('reports').insert({
+      reporter_id: user.id,
+      listing_id: listing.id,
+      reason: reportReason,
+      details: reportDetails || null,
+    })
+    setReportSubmitting(false)
+    if (error) {
+      setReportError('Could not submit report. Please try again.')
+    } else {
+      setReportDone(true)
+      setReportOpen(false)
     }
   }
 
@@ -415,9 +440,69 @@ export default function ListingDetailPage() {
             </div>
           </div>
 
-          <button className="w-full text-xs text-gray-400 hover:text-gray-500 text-center py-2 transition">
-            🚩 Report this listing
-          </button>
+          {reportDone ? (
+            <p className="text-xs text-gray-400 text-center py-2">✓ Report submitted</p>
+          ) : (
+            <button
+              onClick={() => {
+                if (!user) { navigate('/login'); return }
+                setReportOpen(true)
+              }}
+              className="w-full text-xs text-gray-400 hover:text-gray-500 text-center py-2 transition"
+            >
+              🚩 Report this listing
+            </button>
+          )}
+
+          {reportOpen && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center px-4">
+              <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 space-y-4">
+                <h3 className="font-semibold text-gray-900">Report Listing</h3>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Reason *</label>
+                  <select
+                    value={reportReason}
+                    onChange={e => setReportReason(e.target.value)}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
+                  >
+                    <option value="">Select a reason...</option>
+                    <option value="spam">Spam or duplicate</option>
+                    <option value="misleading">Misleading information</option>
+                    <option value="wrong_price">Wrong price listed</option>
+                    <option value="already_rented">Already rented</option>
+                    <option value="inappropriate">Inappropriate content</option>
+                    <option value="scam">Suspected scam</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Details (optional)</label>
+                  <textarea
+                    rows={3}
+                    value={reportDetails}
+                    onChange={e => setReportDetails(e.target.value)}
+                    placeholder="Any additional context..."
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
+                  />
+                </div>
+                {reportError && <p className="text-xs text-red-600">{reportError}</p>}
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleReport}
+                    disabled={!reportReason || reportSubmitting}
+                    className="flex-1 bg-red-700 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-red-800 transition disabled:opacity-50"
+                  >
+                    {reportSubmitting ? 'Submitting...' : 'Submit Report'}
+                  </button>
+                  <button
+                    onClick={() => { setReportOpen(false); setReportReason(''); setReportDetails(''); setReportError(null) }}
+                    className="flex-1 border border-gray-200 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-50 transition"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

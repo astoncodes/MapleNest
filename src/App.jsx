@@ -12,6 +12,8 @@ import ProfilePage from './pages/ProfilePage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import AnalyticsPage from './pages/AnalyticsPage'
+import MessagesInboxPage from './pages/MessagesInboxPage'
+import ConversationPage from './pages/ConversationPage'
 
 
 function ProtectedRoute({ children }) {
@@ -51,7 +53,13 @@ function AppRoutes() {
         <Route path="/profile" element={
           <ProtectedRoute><ProfilePage /></ProtectedRoute>
         } />
-        <Route path="/profile/:id" element={<ProfilePage />} />  
+        <Route path="/profile/:id" element={<ProfilePage />} />
+        <Route path="/messages" element={
+          <ProtectedRoute><MessagesInboxPage /></ProtectedRoute>
+        } />
+        <Route path="/messages/:id" element={
+          <ProtectedRoute><ConversationPage /></ProtectedRoute>
+        } />
       </Routes>
     </div>
   )

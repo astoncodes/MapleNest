@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
@@ -32,7 +32,7 @@ const LEASE_TERMS = [
   { value: 'flexible', label: 'Flexible' },
 ]
 
-export default function CreateListingPage() {
+export default function CreateListingPage({ mode = 'create', listing = null, onSubmitSuccess }) {
   const { user, role } = useAuth()
   const isRenter = role === 'renter'
   const PROPERTY_TYPES = isRenter ? RENTER_PROPERTY_TYPES : ALL_PROPERTY_TYPES
@@ -41,6 +41,9 @@ export default function CreateListingPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [uploadProgress, setUploadProgress] = useState(null)
+  const [existingImages, setExistingImages] = useState([])
+  const [removedImageIds, setRemovedImageIds] = useState([])
+  const [removedImagePaths, setRemovedImagePaths] = useState([])
 
   const [photos, setPhotos] = useState([])           // File objects
   const [photoPreviewUrls, setPhotoPreviewUrls] = useState([])
@@ -65,18 +68,56 @@ export default function CreateListingPage() {
     furnished: false,
   })
 
+  useEffect(() => {
+    if (mode === 'edit' && listing) {
+      setForm({
+        title: listing.title || '',
+        description: listing.description || '',
+        property_type: listing.property_type || '',
+        city: listing.city || 'Charlottetown',
+        neighbourhood: listing.neighbourhood || '',
+        address: listing.address || '',
+        price: listing.price ? String(listing.price) : '',
+        utilities_included: listing.utilities_included || false,
+        bedrooms: listing.bedrooms || 1,
+        bathrooms: listing.bathrooms || 1,
+        square_feet: listing.square_feet ? String(listing.square_feet) : '',
+        available_from: listing.available_from || '',
+        lease_term: listing.lease_term || '1_year',
+        pet_friendly: listing.pet_friendly || false,
+        parking_available: listing.parking_available || false,
+        laundry: listing.laundry || 'none',
+        furnished: listing.furnished || false,
+      })
+      setExistingImages(
+        [...(listing.listing_images || [])].sort((a, b) => {
+          if (a.is_primary && !b.is_primary) return -1
+          if (!a.is_primary && b.is_primary) return 1
+          return a.sort_order - b.sort_order
+        })
+      )
+    }
+  }, [mode, listing])
+
   const update = (field, value) => setForm(prev => ({ ...prev, [field]: value }))
 
   const handlePhotos = (e) => {
     const newFiles = Array.from(e.target.files)
-    const combined = [...photos, ...newFiles].slice(0, 8)
+    const maxNew = Math.max(0, 8 - existingImages.length)
+    const combined = [...photos, ...newFiles].slice(0, maxNew)
+    // Revoke URLs for any existing photos that got cut off by the cap
+    photoPreviewUrls.slice(maxNew).forEach(url => URL.revokeObjectURL(url))
+    // Keep existing URLs for photos we're keeping; create new URLs only for added files
+    const keptUrls = photoPreviewUrls.slice(0, Math.min(photos.length, maxNew))
+    const addedUrls = combined.slice(photos.length).map(f => URL.createObjectURL(f))
     setPhotos(combined)
-    setPhotoPreviewUrls(combined.map(f => URL.createObjectURL(f)))
+    setPhotoPreviewUrls([...keptUrls, ...addedUrls])
     // Reset input so same file can be re-added if needed
     e.target.value = ''
   }
 
   const removePhoto = (index) => {
+    URL.revokeObjectURL(photoPreviewUrls[index])
     const updatedPhotos = photos.filter((_, i) => i !== index)
     const updatedUrls = photoPreviewUrls.filter((_, i) => i !== index)
     setPhotos(updatedPhotos)
@@ -94,7 +135,14 @@ export default function CreateListingPage() {
     setPhotoPreviewUrls(newUrls)
   }
 
-  const uploadPhotos = async (listingId) => {
+  const removeExistingImage = (imgId) => {
+    const img = existingImages.find(i => i.id === imgId)
+    setRemovedImageIds(prev => [...prev, imgId])
+    if (img?.storage_path) setRemovedImagePaths(prev => [...prev, img.storage_path])
+    setExistingImages(prev => prev.filter(i => i.id !== imgId))
+  }
+
+  const uploadPhotos = async (listingId, sortOffset = 0) => {
     const uploadedImages = []
     for (let i = 0; i < photos.length; i++) {
       const file = photos[i]
@@ -138,8 +186,8 @@ export default function CreateListingPage() {
         listing_id: listingId,
         url: urlData.publicUrl,
         storage_path: uploadData.path,
-        is_primary: i === 0,
-        sort_order: i,
+        is_primary: sortOffset === 0 && i === 0,
+        sort_order: sortOffset + i,
       })
     }
 
@@ -162,49 +210,94 @@ export default function CreateListingPage() {
     setLoading(true)
 
     try {
-      // Insert listing
-      const { data, error: insertError } = await supabase
-        .from('listings')
-        .insert({
-          landlord_id: user.id,
-          title: form.title,
-          description: form.description,
-          property_type: form.property_type,
-          city: form.city,
-          neighbourhood: form.neighbourhood,
-          address: form.address,
-          price: parseInt(form.price),
-          utilities_included: form.utilities_included,
-          bedrooms: parseInt(form.bedrooms),
-          bathrooms: parseFloat(form.bathrooms),
-          square_feet: form.square_feet ? parseInt(form.square_feet) : null,
-          available_from: form.available_from || null,
-          lease_term: form.lease_term,
-          pet_friendly: form.pet_friendly,
-          parking_available: form.parking_available,
-          laundry: form.laundry,
-          furnished: form.furnished,
-          status: 'active',
-        })
-        .select()
-        .single()
+      let listingId
 
-      if (insertError) throw insertError
+      if (mode === 'edit') {
+        const { error: updateError } = await supabase
+          .from('listings')
+          .update({
+            title: form.title,
+            description: form.description,
+            property_type: form.property_type,
+            city: form.city,
+            neighbourhood: form.neighbourhood,
+            address: form.address,
+            price: parseInt(form.price),
+            utilities_included: form.utilities_included,
+            bedrooms: parseInt(form.bedrooms),
+            bathrooms: parseFloat(form.bathrooms),
+            square_feet: form.square_feet ? parseInt(form.square_feet) : null,
+            available_from: form.available_from || null,
+            lease_term: form.lease_term,
+            pet_friendly: form.pet_friendly,
+            parking_available: form.parking_available,
+            laundry: form.laundry,
+            furnished: form.furnished,
+          })
+          .eq('id', listing.id)
 
-      // Upload photos if any
+        if (updateError) throw updateError
+        listingId = listing.id
+
+        // Delete removed images from DB and storage
+        if (removedImageIds.length > 0) {
+          await supabase.from('listing_images').delete().in('id', removedImageIds)
+          if (removedImagePaths.length > 0) {
+            await supabase.storage.from('listing-images').remove(removedImagePaths)
+          }
+        }
+      } else {
+        const { data, error: insertError } = await supabase
+          .from('listings')
+          .insert({
+            landlord_id: user.id,
+            title: form.title,
+            description: form.description,
+            property_type: form.property_type,
+            city: form.city,
+            neighbourhood: form.neighbourhood,
+            address: form.address,
+            price: parseInt(form.price),
+            utilities_included: form.utilities_included,
+            bedrooms: parseInt(form.bedrooms),
+            bathrooms: parseFloat(form.bathrooms),
+            square_feet: form.square_feet ? parseInt(form.square_feet) : null,
+            available_from: form.available_from || null,
+            lease_term: form.lease_term,
+            pet_friendly: form.pet_friendly,
+            parking_available: form.parking_available,
+            laundry: form.laundry,
+            furnished: form.furnished,
+            status: 'active',
+          })
+          .select()
+          .single()
+
+        if (insertError) throw insertError
+        listingId = data.id
+      }
+
+      // Upload any new photos
       if (photos.length > 0) {
-        const uploaded = await uploadPhotos(data.id)
+        const sortOffset = existingImages.length
+        const uploaded = await uploadPhotos(listingId, sortOffset)
         if (uploaded === 0 && photos.length > 0) {
-          // Photos failed but listing was created — navigate anyway with warning
-          setError('Listing created but photos failed to upload. You can add photos by editing the listing.')
-          setTimeout(() => navigate(`/listings/${data.id}`), 2500)
+          setError('Listing saved but new photos failed to upload. You can try again from Edit.')
+          setTimeout(() => {
+            if (onSubmitSuccess) onSubmitSuccess()
+            else navigate(`/listings/${listingId}`)
+          }, 2500)
           return
         }
       }
 
-      navigate(`/listings/${data.id}`)
+      if (onSubmitSuccess) {
+        onSubmitSuccess()
+      } else {
+        navigate(`/listings/${listingId}`)
+      }
     } catch (err) {
-      console.error('Listing creation failed:', err)
+      console.error('Listing submit failed:', err)
       setError(err.message || 'Something went wrong. Please try again.')
     } finally {
       setLoading(false)
@@ -223,9 +316,13 @@ export default function CreateListingPage() {
   return (
     <div className="max-w-2xl mx-auto px-4 py-10">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">{isRenter ? 'Post a Sublease' : 'Post a Listing'}</h1>
+        <h1 className="text-2xl font-bold text-gray-900">
+          {mode === 'edit' ? 'Edit Listing' : isRenter ? 'Post a Sublease' : 'Post a Listing'}
+        </h1>
         <p className="text-gray-500 text-sm mt-1">
-          {isRenter
+          {mode === 'edit'
+            ? 'Update your property details'
+            : isRenter
             ? 'List your space for sublet and find someone to take over your lease'
             : 'Fill in your property details to connect with renters'}
         </p>
@@ -423,9 +520,39 @@ export default function CreateListingPage() {
               </p>
             </div>
 
+            {existingImages.length > 0 && (
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
+                  Current Photos ({existingImages.length})
+                </p>
+                <div className="grid grid-cols-4 gap-2 mb-4">
+                  {existingImages.map((img, i) => (
+                    <div key={img.id} className="relative group">
+                      <div className="aspect-square rounded-lg overflow-hidden bg-gray-100">
+                        <img src={img.url} alt={`Existing ${i + 1}`} className="w-full h-full object-cover" />
+                      </div>
+                      {img.is_primary && (
+                        <div className="absolute top-1 left-1 bg-red-700 text-white text-xs px-1.5 py-0.5 rounded font-medium">
+                          Main
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => removeExistingImage(img.id)}
+                        className="absolute top-1 right-1 bg-red-600 text-white rounded text-xs w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition hover:bg-red-700"
+                        title="Remove photo"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Upload area */}
             <label className={`block border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition ${
-              photos.length >= 8
+              photos.length + existingImages.length >= 8
                 ? 'border-gray-100 bg-gray-50 cursor-not-allowed'
                 : 'border-gray-200 hover:border-red-300 hover:bg-red-50'
             }`}>
@@ -434,15 +561,15 @@ export default function CreateListingPage() {
                 accept="image/jpeg,image/png,image/webp,image/heic"
                 multiple
                 className="hidden"
-                disabled={photos.length >= 8}
+                disabled={photos.length + existingImages.length >= 8}
                 onChange={handlePhotos}
               />
               <div className="text-3xl mb-2">📷</div>
               <p className="text-sm font-medium text-gray-700">
-                {photos.length >= 8 ? 'Maximum 8 photos reached' : 'Click to add photos'}
+                {photos.length + existingImages.length >= 8 ? 'Maximum 8 photos reached' : 'Click to add photos'}
               </p>
               <p className="text-xs text-gray-400 mt-1">
-                JPG, PNG, WebP — max 10MB each · {photos.length}/8 added
+                JPG, PNG, WebP — max 10MB each · {photos.length + existingImages.length}/8 added
               </p>
             </label>
 
@@ -520,9 +647,9 @@ export default function CreateListingPage() {
             <button onClick={handleSubmit} disabled={loading}
               className="px-6 py-2.5 text-sm font-semibold bg-red-700 text-white rounded-lg hover:bg-red-800 transition disabled:opacity-50 flex items-center gap-2">
               {loading ? (
-                <><span className="animate-spin">⏳</span> {uploadProgress || 'Publishing...'}</>
+                <><span className="animate-spin">⏳</span> {uploadProgress || (mode === 'edit' ? 'Saving...' : 'Publishing...')}</>
               ) : (
-                '🍁 Publish Listing'
+                mode === 'edit' ? '✓ Save Changes' : '🍁 Publish Listing'
               )}
             </button>
           )}

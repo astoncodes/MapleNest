@@ -151,8 +151,10 @@ export default function ListingsPage() {
     if (filters.utilitiesIncluded)
       query = query.eq('utilities_included', true);
 
-    if (search?.trim())
-      query = query.ilike('title', `%${search.trim()}%`);
+    if (queryFromParams?.trim()) {
+      const q = queryFromParams.trim().replace(/[(),%_]/g, ' ');
+      query = query.or(`title.ilike.%${q}%,neighbourhood.ilike.%${q}%,description.ilike.%${q}%`);
+    }
 
     const { data, error } = await query;
 
@@ -178,7 +180,7 @@ export default function ListingsPage() {
       delete params.q
     }
     setSearchParams(params, { replace: true })
-    fetchListings()
+    // Do NOT call fetchListings() here — the useEffect([filters, queryFromParams]) handles it
   }
 
   const activeFilterCount = [
