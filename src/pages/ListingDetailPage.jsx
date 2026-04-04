@@ -494,7 +494,7 @@ export default function ListingDetailPage() {
                     {reportSubmitting ? 'Submitting...' : 'Submit Report'}
                   </button>
                   <button
-                    onClick={() => { setReportOpen(false); setReportReason(''); setReportDetails('') }}
+                    onClick={() => { setReportOpen(false); setReportReason(''); setReportDetails(''); setReportError(null) }}
                     className="flex-1 border border-gray-200 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-50 transition"
                   >
                     Cancel

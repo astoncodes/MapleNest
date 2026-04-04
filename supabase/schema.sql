@@ -297,6 +297,11 @@ CREATE POLICY "Participants can mark messages read" ON public.messages
     )
   );
 
+DROP POLICY IF EXISTS "Authenticated users can submit reports" ON public.reports;
+CREATE POLICY "Authenticated users can submit reports" ON public.reports
+  FOR INSERT
+  WITH CHECK (auth.uid() = reporter_id);
+
 -- =============================================
 -- TRIGGERS
 -- =============================================
