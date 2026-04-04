@@ -5,7 +5,8 @@
 DROP POLICY IF EXISTS "Participants can update conversation" ON public.conversations;
 CREATE POLICY "Participants can update conversation" ON public.conversations
   FOR UPDATE
-  USING (auth.uid() = renter_id OR auth.uid() = landlord_id);
+  USING (auth.uid() = renter_id OR auth.uid() = landlord_id)
+  WITH CHECK (auth.uid() = renter_id OR auth.uid() = landlord_id);
 
 -- Allow participants to mark messages as read (update read = true)
 DROP POLICY IF EXISTS "Participants can mark messages read" ON public.messages;

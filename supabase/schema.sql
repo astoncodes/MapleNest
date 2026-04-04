@@ -253,15 +253,21 @@ CREATE POLICY "Users can unsave listings" ON public.saved_listings
 
 DROP POLICY IF EXISTS "Conversation participants can view" ON public.conversations;
 DROP POLICY IF EXISTS "Renters can create conversations" ON public.conversations;
+DROP POLICY IF EXISTS "Participants can update conversation" ON public.conversations;
 CREATE POLICY "Conversation participants can view" ON public.conversations
   FOR SELECT
   USING (auth.uid() = renter_id OR auth.uid() = landlord_id);
 CREATE POLICY "Renters can create conversations" ON public.conversations
   FOR INSERT
   WITH CHECK (auth.uid() = renter_id);
+CREATE POLICY "Participants can update conversation" ON public.conversations
+  FOR UPDATE
+  USING (auth.uid() = renter_id OR auth.uid() = landlord_id)
+  WITH CHECK (auth.uid() = renter_id OR auth.uid() = landlord_id);
 
 DROP POLICY IF EXISTS "Participants can view messages" ON public.messages;
 DROP POLICY IF EXISTS "Participants can send messages" ON public.messages;
+DROP POLICY IF EXISTS "Participants can mark messages read" ON public.messages;
 CREATE POLICY "Participants can view messages" ON public.messages
   FOR SELECT
   USING (
@@ -276,6 +282,15 @@ CREATE POLICY "Participants can send messages" ON public.messages
   WITH CHECK (
     auth.uid() = sender_id
     AND EXISTS (
+      SELECT 1 FROM public.conversations c
+      WHERE c.id = conversation_id
+        AND (c.renter_id = auth.uid() OR c.landlord_id = auth.uid())
+    )
+  );
+CREATE POLICY "Participants can mark messages read" ON public.messages
+  FOR UPDATE
+  USING (
+    EXISTS (
       SELECT 1 FROM public.conversations c
       WHERE c.id = conversation_id
         AND (c.renter_id = auth.uid() OR c.landlord_id = auth.uid())

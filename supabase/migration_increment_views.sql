@@ -6,6 +6,7 @@ CREATE OR REPLACE FUNCTION public.increment_views(p_listing_id uuid)
 RETURNS void
 LANGUAGE sql
 SECURITY DEFINER
+SET search_path = public
 AS $$
   UPDATE public.listings SET views = views + 1 WHERE id = p_listing_id;
 $$;
