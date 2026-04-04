@@ -12,9 +12,10 @@ export default function Navbar() {
     if (!user) { setUnreadCount(0); return }
     supabase
       .from('conversations')
-      .select('renter_id, renter_unread, landlord_unread')
+      .select('renter_id, landlord_id, renter_unread, landlord_unread')
       .or(`renter_id.eq.${user.id},landlord_id.eq.${user.id}`)
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (error) { console.error('Navbar: failed to fetch unread counts', error); return }
         if (!data) return
         const total = data.reduce((sum, c) => {
           return sum + (user.id === c.renter_id ? (c.renter_unread || 0) : (c.landlord_unread || 0))
