@@ -1,9 +1,27 @@
 import { Link, useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 
 export default function Navbar() {
   const { user, signOut, isLandlord } = useAuth()
   const navigate = useNavigate()
+  const [unreadCount, setUnreadCount] = useState(0)
+
+  useEffect(() => {
+    if (!user) { setUnreadCount(0); return }
+    supabase
+      .from('conversations')
+      .select('renter_id, renter_unread, landlord_unread')
+      .or(`renter_id.eq.${user.id},landlord_id.eq.${user.id}`)
+      .then(({ data }) => {
+        if (!data) return
+        const total = data.reduce((sum, c) => {
+          return sum + (user.id === c.renter_id ? (c.renter_unread || 0) : (c.landlord_unread || 0))
+        }, 0)
+        setUnreadCount(total)
+      })
+  }, [user?.id])
 
   const handleSignOut = async () => {
     await signOut()
@@ -25,6 +43,16 @@ export default function Navbar() {
           <Link to="/analytics" className="text-gray-600 hover:text-gray-900 text-sm font-medium">
             Analytics
           </Link>
+          {user && (
+            <Link to="/messages" className="relative text-gray-600 hover:text-gray-900 text-sm font-medium">
+              Messages
+              {unreadCount > 0 && (
+                <span className="absolute -top-1.5 -right-2.5 bg-red-600 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-bold leading-none">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </Link>
+          )}
           {user ? (
             <>
               {isLandlord ? (
