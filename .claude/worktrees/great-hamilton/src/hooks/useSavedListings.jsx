@@ -37,7 +37,9 @@ export function useSavedListings() {
 
   const toggleSave = useCallback(async (listingId) => {
     if (!user) return false
-    const isCurrentlySaved = savedIds.has(listingId)
+    // Read current state to decide direction
+    let isCurrentlySaved = false
+    setSavedIds(prev => { isCurrentlySaved = prev.has(listingId); return prev })
 
     // Optimistic update
     setSavedIds(prev => {
@@ -62,7 +64,7 @@ export function useSavedListings() {
       return false
     }
     return true
-  }, [user, savedIds])
+  }, [user])
 
   return { isSaved, toggleSave, savedIds, loading, error }
 }

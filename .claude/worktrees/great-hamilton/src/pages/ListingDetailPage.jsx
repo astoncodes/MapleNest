@@ -223,18 +223,16 @@ export default function ListingDetailPage() {
 
       if (existing) { navigate(`/messages/${existing.id}`); return }
 
-      // Don't create the conversation until the first message is sent.
-      // Pass context via router state so the chat page can display the listing/landlord.
-      navigate('/messages/new', {
-        state: {
-          listingId: id,
-          landlordId: listing.landlord_id,
-          listing: { id, title: listing.title, city: listing.city, listing_images: listing.listing_images },
-          landlord,
-        },
-      })
+      const { data: convo, error } = await supabase
+        .from('conversations')
+        .insert({ listing_id: id, renter_id: user.id, landlord_id: listing.landlord_id })
+        .select()
+        .single()
+
+      if (error) throw error
+      navigate(`/messages/${convo.id}`)
     } catch (err) {
-      setContactError('Could not open conversation. Please try again.')
+      setContactError('Could not start conversation. Please try again.')
     } finally {
       setContacting(false)
     }

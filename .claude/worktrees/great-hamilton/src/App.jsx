@@ -23,6 +23,13 @@ function ProtectedRoute({ children }) {
   return children
 }
 
+function LandlordRoute({ children }) {
+  const { user, loading, role } = useAuth()
+  if (loading) return <div className="flex items-center justify-center min-h-screen">Loading...</div>
+  if (!user) return <Navigate to="/login" replace />
+  if (role !== 'landlord') return <Navigate to="/profile" replace />
+  return children
+}
 
 function AppRoutes() {
   return (

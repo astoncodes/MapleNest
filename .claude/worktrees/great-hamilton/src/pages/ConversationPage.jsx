@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Link, useParams, useNavigate, useLocation } from 'react-router-dom'
+import { Link, useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 
@@ -26,41 +26,21 @@ export default function ConversationPage() {
   const { id } = useParams()
   const { user } = useAuth()
   const navigate = useNavigate()
-  const location = useLocation()
-  const isNew = id === 'new'
-  const newConvoState = location.state // { listingId, landlordId, listing, landlord }
-
   const [conversation, setConversation] = useState(null)
   const conversationRef = useRef(null)
   const [messages, setMessages] = useState([])
   const [newMessage, setNewMessage] = useState('')
-  const [loading, setLoading] = useState(!isNew)
+  const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [error, setError] = useState(null)
   const bottomRef = useRef(null)
   const inputRef = useRef(null)
-  const lastMessageAtRef = useRef(null)
 
-  // Keep ref in sync with conversation state for use inside real-time callbacks
   useEffect(() => {
     conversationRef.current = conversation
   }, [conversation])
 
-  // Initialize: either fetch existing conversation or set up from router state
   useEffect(() => {
-    if (isNew) {
-      if (!newConvoState?.listingId) { navigate('/messages'); return }
-      setConversation({
-        id: null,
-        renter_id: user.id,
-        landlord_id: newConvoState.landlordId,
-        listing: newConvoState.listing,
-        landlord: newConvoState.landlord,
-        renter: user?.profile,
-      })
-      setLoading(false)
-      return
-    }
     if (user) fetchConversation()
   }, [id, user?.id])
 
@@ -71,13 +51,14 @@ export default function ConversationPage() {
 
   // Real-time subscription for new messages from the other party
   useEffect(() => {
-    if (!id || isNew || !user) return
+    if (!id || !user) return
     const channel = supabase
       .channel(`messages-${id}`)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${id}` },
         async (payload) => {
+          // Skip messages we sent ourselves (already added optimistically)
           if (payload.new.sender_id === user.id) return
           const { data: msg } = await supabase
             .from('messages')
@@ -85,12 +66,10 @@ export default function ConversationPage() {
             .eq('id', payload.new.id)
             .single()
           if (msg) {
-            setMessages(prev => {
-              if (prev.some(m => m.id === msg.id)) return prev
-              lastMessageAtRef.current = msg.created_at
-              return [...prev, msg]
-            })
+            setMessages(prev => [...prev, msg])
+            // Mark as read immediately since user is viewing
             supabase.from('messages').update({ read: true }).eq('id', msg.id)
+            // Decrement our unread counter since we're actively viewing
             const convo = conversationRef.current
             if (convo) {
               const myUnreadField = user.id === convo.renter_id ? 'renter_unread' : 'landlord_unread'
@@ -102,35 +81,6 @@ export default function ConversationPage() {
       )
       .subscribe()
     return () => { supabase.removeChannel(channel) }
-  }, [id, user?.id])
-
-  // Polling fallback — catches messages real-time misses (e.g. replication not enabled)
-  useEffect(() => {
-    if (!id || isNew || !user) return
-    const poll = setInterval(async () => {
-      const since = lastMessageAtRef.current
-      if (!since) return
-      const { data } = await supabase
-        .from('messages')
-        .select('id, content, created_at, read, sender_id, sender:sender_id(id, full_name, avatar_url, email)')
-        .eq('conversation_id', id)
-        .gt('created_at', since)
-        .order('created_at', { ascending: true })
-      if (!data?.length) return
-      setMessages(prev => {
-        const existingIds = new Set(prev.map(m => m.id))
-        const incoming = data.filter(m => !existingIds.has(m.id))
-        if (!incoming.length) return prev
-        lastMessageAtRef.current = data[data.length - 1].created_at
-        // Mark other party's new messages as read
-        const others = incoming.filter(m => m.sender_id !== user.id)
-        if (others.length) {
-          supabase.from('messages').update({ read: true }).in('id', others.map(m => m.id))
-        }
-        return [...prev, ...incoming]
-      })
-    }, 5000)
-    return () => clearInterval(poll)
   }, [id, user?.id])
 
   const fetchConversation = async () => {
@@ -147,6 +97,8 @@ export default function ConversationPage() {
       .single()
 
     if (convoErr || !convo) { navigate('/messages'); return }
+
+    // Redirect if current user is not a participant
     if (convo.renter_id !== user.id && convo.landlord_id !== user.id) {
       navigate('/messages'); return
     }
@@ -160,10 +112,9 @@ export default function ConversationPage() {
       .order('created_at', { ascending: true })
 
     setMessages(msgs || [])
-    if (msgs?.length) lastMessageAtRef.current = msgs[msgs.length - 1].created_at
     setLoading(false)
 
-    // Mark other party's messages as read + reset own unread counter
+    // Mark messages from the other party as read
     await supabase
       .from('messages')
       .update({ read: true })
@@ -171,6 +122,7 @@ export default function ConversationPage() {
       .neq('sender_id', user.id)
       .eq('read', false)
 
+    // Reset own unread count to 0
     const unreadField = user.id === convo.renter_id ? 'renter_unread' : 'landlord_unread'
     await supabase.from('conversations').update({ [unreadField]: 0 }).eq('id', id)
   }
@@ -184,62 +136,6 @@ export default function ConversationPage() {
     setNewMessage('')
     setError(null)
 
-    // New conversation: create the conversation row first, then insert the message
-    if (isNew) {
-      const { data: convo, error: convoErr } = await supabase
-        .from('conversations')
-        .insert({
-          listing_id: newConvoState.listingId,
-          renter_id: user.id,
-          landlord_id: newConvoState.landlordId,
-        })
-        .select('id')
-        .single()
-
-      if (convoErr) {
-        // Conversation may already exist (race condition) — fall through to existing
-        const { data: existing } = await supabase
-          .from('conversations')
-          .select('id')
-          .eq('listing_id', newConvoState.listingId)
-          .eq('renter_id', user.id)
-          .maybeSingle()
-        if (existing) {
-          setSending(false)
-          setNewMessage(content)
-          navigate(`/messages/${existing.id}`, { replace: true })
-          return
-        }
-        setError('Could not start conversation. Please try again.')
-        setNewMessage(content)
-        setSending(false)
-        return
-      }
-
-      const { error: sendErr } = await supabase
-        .from('messages')
-        .insert({ conversation_id: convo.id, sender_id: user.id, content })
-
-      if (sendErr) {
-        setError('Failed to send message. Please try again.')
-        setNewMessage(content)
-        setSending(false)
-        return
-      }
-
-      await supabase.from('conversations').update({
-        last_message: content,
-        last_message_at: new Date().toISOString(),
-        landlord_unread: 1,
-      }).eq('id', convo.id)
-
-      // Navigate to the real conversation — component remounts and fetches cleanly
-      navigate(`/messages/${convo.id}`, { replace: true })
-      setSending(false)
-      return
-    }
-
-    // Existing conversation
     const { data: msg, error: sendErr } = await supabase
       .from('messages')
       .insert({ conversation_id: id, sender_id: user.id, content })
@@ -248,14 +144,15 @@ export default function ConversationPage() {
 
     if (sendErr) {
       setError('Failed to send message. Please try again.')
-      setNewMessage(content)
+      setNewMessage(content) // restore
       setSending(false)
       return
     }
 
+    // Add optimistically (real-time subscription skips own messages)
     setMessages(prev => [...prev, msg])
-    if (msg) lastMessageAtRef.current = msg.created_at
 
+    // Update conversation metadata + increment other party's unread
     const otherUnreadField = user.id === conversation.renter_id ? 'landlord_unread' : 'renter_unread'
     const currentOtherUnread = user.id === conversation.renter_id
       ? (conversation.landlord_unread || 0)
@@ -267,6 +164,7 @@ export default function ConversationPage() {
       [otherUnreadField]: currentOtherUnread + 1,
     }).eq('id', id)
 
+    // Keep local conversation state current so next send reads correct unread count
     setConversation(prev => prev ? { ...prev, [otherUnreadField]: currentOtherUnread + 1 } : prev)
 
     setSending(false)
@@ -286,9 +184,9 @@ export default function ConversationPage() {
     </div>
   )
 
-  const listingImage = conversation?.listing?.listing_images?.find(i => i.is_primary)
-    || conversation?.listing?.listing_images?.[0]
-  const other = user.id === conversation?.renter_id ? conversation?.landlord : conversation?.renter
+  const listingImage = conversation.listing?.listing_images?.find(i => i.is_primary)
+    || conversation.listing?.listing_images?.[0]
+  const other = user.id === conversation.renter_id ? conversation.landlord : conversation.renter
 
   return (
     <div className="max-w-2xl mx-auto flex flex-col" style={{ height: 'calc(100vh - 64px)' }}>
@@ -301,15 +199,12 @@ export default function ConversationPage() {
           </div>
         )}
         <div className="flex-1 min-w-0">
-          <Link
-            to={conversation?.listing?.id ? `/listings/${conversation.listing.id}` : '#'}
-            className="font-semibold text-sm text-gray-900 hover:text-red-700 truncate block transition"
-          >
-            {conversation?.listing?.title || 'Listing'}
+          <Link to={`/listings/${conversation.listing?.id}`} className="font-semibold text-sm text-gray-900 hover:text-red-700 truncate block transition">
+            {conversation.listing?.title || 'Listing'}
           </Link>
           <p className="text-xs text-gray-500 truncate">
             {other?.full_name || other?.email || 'User'}
-            {conversation?.listing?.city ? ` · ${conversation.listing.city}` : ''}
+            {conversation.listing?.city ? ` · ${conversation.listing.city}` : ''}
           </p>
         </div>
       </div>
@@ -318,7 +213,7 @@ export default function ConversationPage() {
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
         {messages.length === 0 && (
           <p className="text-center text-sm text-gray-400 py-8">
-            {isNew ? 'Send a message to start the conversation.' : 'No messages yet. Say hello!'}
+            No messages yet. Say hello!
           </p>
         )}
         {messages.map(msg => {
