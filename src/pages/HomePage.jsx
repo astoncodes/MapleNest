@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../hooks/useAuth'
 
 const roundUp = (n) => {
   if (n <= 0) return '0'
@@ -11,24 +12,29 @@ const roundUp = (n) => {
 export default function HomePage() {
   const [search, setSearch] = useState('')
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [stats, setStats] = useState({ listings: null, landlords: null, renters: null })
 
   useEffect(() => {
     const fetchStats = async () => {
-      const [
-        { count: listingCount },
-        { count: landlordCount },
-        { count: renterCount },
-      ] = await Promise.all([
-        supabase.from('listings').select('*', { count: 'exact', head: true }).eq('status', 'active'),
-        supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'landlord'),
-        supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'renter'),
-      ])
-      setStats({
-        listings: listingCount ?? 0,
-        landlords: landlordCount ?? 0,
-        renters: renterCount ?? 0,
-      })
+      try {
+        const [
+          { count: listingCount },
+          { count: landlordCount },
+          { count: renterCount },
+        ] = await Promise.all([
+          supabase.from('listings').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+          supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'landlord'),
+          supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'renter'),
+        ])
+        setStats({
+          listings: listingCount ?? 0,
+          landlords: landlordCount ?? 0,
+          renters: renterCount ?? 0,
+        })
+      } catch {
+        setStats({ listings: 0, landlords: 0, renters: 0 })
+      }
     }
     fetchStats()
   }, [])
@@ -113,10 +119,10 @@ export default function HomePage() {
       <section className="bg-red-50 py-12 px-4 text-center">
         <h2 className="text-xl font-bold text-gray-800 mb-3">Are you a landlord in PEI?</h2>
         <p className="text-gray-500 text-sm mb-6">List your property for free and connect with verified renters.</p>
-        <a href="/signup"
+        <Link to={user ? '/create-listing' : '/signup'}
           className="bg-red-700 text-white px-8 py-3 rounded-lg font-semibold hover:bg-red-800 transition">
           Post a Free Listing
-        </a>
+        </Link>
       </section>
     </div>
   )

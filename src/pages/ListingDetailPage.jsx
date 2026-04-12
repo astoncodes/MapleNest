@@ -484,6 +484,7 @@ export default function ListingDetailPage() {
                     onChange={e => setReportDetails(e.target.value)}
                     placeholder="Any additional context..."
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
+                    maxLength={1000}
                   />
                 </div>
                 {reportError && <p className="text-xs text-red-600">{reportError}</p>}

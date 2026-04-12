@@ -68,6 +68,11 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
     furnished: false,
   })
 
+  // Revoke all object URLs when the component unmounts to prevent memory leaks
+  useEffect(() => {
+    return () => { photoPreviewUrls.forEach(url => URL.revokeObjectURL(url)) }
+  }, [])
+
   useEffect(() => {
     if (mode === 'edit' && listing) {
       setForm({
@@ -363,7 +368,8 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
               <label className={labelClass}>Listing Title *</label>
               <input type="text" className={inputClass} value={form.title}
                 onChange={e => update('title', e.target.value)}
-                placeholder="e.g. Bright 2BR near UPEI, utilities included" />
+                placeholder="e.g. Bright 2BR near UPEI, utilities included"
+                maxLength={120} />
             </div>
 
             <div>
@@ -416,7 +422,8 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
               <label className={labelClass}>Description</label>
               <textarea className={inputClass} rows={4} value={form.description}
                 onChange={e => update('description', e.target.value)}
-                placeholder="Describe your property — highlights, nearby transit, what's included..." />
+                placeholder="Describe your property — highlights, nearby transit, what's included..."
+                maxLength={3000} />
             </div>
           </div>
         )}

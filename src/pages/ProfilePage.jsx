@@ -163,10 +163,11 @@ export default function ProfilePage() {
     setAvatarUploading(true)
     const ext = file.name.split('.').pop()
     const path = `avatars/${user.id}.${ext}`
-    await supabase.storage.from('listing-images').upload(path, file, { upsert: true })
+    const { error: uploadErr } = await supabase.storage.from('listing-images').upload(path, file, { upsert: true })
+    if (uploadErr) { setAvatarUploading(false); return }
     const { data } = supabase.storage.from('listing-images').getPublicUrl(path)
-    await supabase.from('profiles').update({ avatar_url: data.publicUrl }).eq('id', user.id)
-    setProfile(prev => ({ ...prev, avatar_url: data.publicUrl }))
+    const { error: updateErr } = await supabase.from('profiles').update({ avatar_url: data.publicUrl }).eq('id', user.id)
+    if (!updateErr) setProfile(prev => ({ ...prev, avatar_url: data.publicUrl }))
     setAvatarUploading(false)
   }
 
@@ -189,6 +190,7 @@ export default function ProfilePage() {
   const handleSubmitReview = async (e) => {
     e.preventDefault()
     if (!reviewForm.rating) { setReviewError('Please select a star rating.'); return }
+    if (user?.id === viewingId) { setReviewError('You cannot review yourself.'); return }
     setReviewLoading(true); setReviewError(null)
     const { error } = await supabase.from('reviews').insert({
       reviewer_id: user.id,
@@ -267,7 +269,8 @@ export default function ProfilePage() {
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">Full Name</label>
                 <input value={editForm.full_name} onChange={e => setEditForm(p => ({ ...p, full_name: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300" />
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
+                  maxLength={80} />
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">Phone</label>
@@ -279,7 +282,8 @@ export default function ProfilePage() {
                 <label className="block text-xs font-medium text-gray-500 mb-1">Bio</label>
                 <textarea value={editForm.bio} rows={3} onChange={e => setEditForm(p => ({ ...p, bio: e.target.value }))}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
-                  placeholder="Tell renters or landlords a bit about yourself..." />
+                  placeholder="Tell renters or landlords a bit about yourself..."
+                  maxLength={500} />
               </div>
               {saveError && <p className="text-xs text-red-600">{saveError}</p>}
               <div className="flex gap-2">

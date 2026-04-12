@@ -77,7 +77,7 @@ function ListingCard({ listing, isSaved, onToggleSave }) {
         {listing.created_at && (
           <div className="flex items-center justify-between pt-2 mt-2 border-t border-gray-50 text-xs text-gray-400">
             <span>Posted {timeAgo(listing.created_at)}</span>
-            {listing.views > 0 && <span>👁 {listing.views}</span>}
+            {listing.views > 0 && <span>{listing.views} views</span>}
           </div>
         )}
       </div>

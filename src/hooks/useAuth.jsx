@@ -46,7 +46,10 @@ const enrichUser = async (sessionUser) => {
     }
 
     const persistedRole = normalizeRole(profile.role)
-    const role = profile.role === 'admin' ? 'admin' : (metadataRole === 'landlord' ? 'landlord' : persistedRole)
+    // Use DB role as source of truth. Only allow metadata to set landlord on first sign-up
+    // (when profile.role defaults to 'renter' and metadataRole carries the signup intent).
+    const isFirstSignup = profile.role === 'renter' && metadataRole === 'landlord'
+    const role = profile.role === 'admin' ? 'admin' : (isFirstSignup ? 'landlord' : persistedRole)
 
     if (profile.role !== role && profile.role !== 'admin') {
       await supabase

@@ -354,6 +354,7 @@ export default function ConversationPage() {
             onChange={e => setNewMessage(e.target.value)}
             placeholder="Type a message..."
             className="flex-1 border border-gray-200 rounded-full px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
+            maxLength={2000}
             disabled={sending}
           />
           <button
