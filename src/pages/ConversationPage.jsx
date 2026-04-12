@@ -58,6 +58,13 @@ export default function ConversationPage() {
         landlord: newConvoState.landlord,
         renter: user?.profile,
       })
+      // Pre-fill message with unit/room context
+      if (newConvoState.unitName) {
+        const roomPart = newConvoState.roomName
+          ? ` (${newConvoState.roomName})`
+          : ''
+        setNewMessage(`Hi, I'm interested in ${newConvoState.unitName}${roomPart} — is it still available?`)
+      }
       setLoading(false)
       return
     }
@@ -192,6 +199,8 @@ export default function ConversationPage() {
           listing_id: newConvoState.listingId,
           renter_id: user.id,
           landlord_id: newConvoState.landlordId,
+          unit_id: newConvoState.unitId || null,
+          room_id: newConvoState.roomId || null,
         })
         .select('id')
         .single()
