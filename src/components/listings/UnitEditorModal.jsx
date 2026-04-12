@@ -10,16 +10,17 @@ function RoomEditor({ unitId, basePricePlaceholder }) {
   const [form, setForm] = useState({ room_name: '', price: '', available_from: '', status: 'available' })
   const [editingId, setEditingId] = useState(null)
 
-  useEffect(() => { fetchRooms() }, [unitId])
-
-  const fetchRooms = async () => {
-    const { data } = await supabase
-      .from('listing_unit_rooms')
-      .select('*')
-      .eq('unit_id', unitId)
-      .order('sort_order')
-    setRooms(data || [])
-  }
+  useEffect(() => {
+    const fetchRooms = async () => {
+      const { data, error } = await supabase
+        .from('listing_unit_rooms')
+        .select('*')
+        .eq('unit_id', unitId)
+        .order('sort_order')
+      if (!error) setRooms(data || [])
+    }
+    fetchRooms()
+  }, [unitId])
 
   const resetForm = () => {
     setForm({ room_name: '', price: '', available_from: '', status: 'available' })
@@ -35,28 +36,34 @@ function RoomEditor({ unitId, basePricePlaceholder }) {
       price: form.price ? parseInt(form.price) : null,
       available_from: form.available_from || null,
       status: form.status,
-      sort_order: editingId ? undefined : rooms.length,
+      ...(editingId ? {} : { sort_order: rooms.length }),
     }
     if (editingId) {
-      await supabase.from('listing_unit_rooms').update(payload).eq('id', editingId)
+      const { error } = await supabase.from('listing_unit_rooms').update(payload).eq('id', editingId)
+      if (!error) {
+        setRooms(prev => prev.map(r => r.id === editingId ? { ...r, ...payload } : r))
+        resetForm()
+      }
     } else {
-      await supabase.from('listing_unit_rooms').insert(payload)
+      const { data, error } = await supabase.from('listing_unit_rooms').insert(payload).select().single()
+      if (!error && data) {
+        setRooms(prev => [...prev, data])
+        resetForm()
+      }
     }
-    await fetchRooms()
-    resetForm()
     setSaving(false)
   }
 
   const handleDelete = async (roomId, status) => {
     if (status === 'occupied') return
-    await supabase.from('listing_unit_rooms').delete().eq('id', roomId)
-    setRooms(prev => prev.filter(r => r.id !== roomId))
+    const { error } = await supabase.from('listing_unit_rooms').delete().eq('id', roomId)
+    if (!error) setRooms(prev => prev.filter(r => r.id !== roomId))
   }
 
   const handleToggleOccupied = async (room) => {
     const next = room.status === 'occupied' ? 'available' : 'occupied'
-    await supabase.from('listing_unit_rooms').update({ status: next }).eq('id', room.id)
-    setRooms(prev => prev.map(r => r.id === room.id ? { ...r, status: next } : r))
+    const { error } = await supabase.from('listing_unit_rooms').update({ status: next }).eq('id', room.id)
+    if (!error) setRooms(prev => prev.map(r => r.id === room.id ? { ...r, status: next } : r))
   }
 
   const startEdit = (room) => {
@@ -92,7 +99,7 @@ function RoomEditor({ unitId, basePricePlaceholder }) {
         <input className={inputClass} placeholder="Room name e.g. Master, Room 1" maxLength={60}
           value={form.room_name} onChange={e => setForm(p => ({ ...p, room_name: e.target.value }))} />
         <div className="grid grid-cols-2 gap-2">
-          <input className={inputClass} placeholder={`Price (blank = ${basePricePlaceholder})`} type="number"
+          <input className={inputClass} placeholder={`Price (blank = ${basePricePlaceholder})`} type="number" min={0}
             value={form.price} onChange={e => setForm(p => ({ ...p, price: e.target.value }))} />
           <input className={inputClass} type="date"
             value={form.available_from} onChange={e => setForm(p => ({ ...p, available_from: e.target.value }))} />
@@ -112,7 +119,6 @@ function RoomEditor({ unitId, basePricePlaceholder }) {
 }
 
 export default function UnitEditorModal({ listingId, basePrice, unit, onSaved, onClose }) {
-  const isEdit = !!unit
   const [form, setForm] = useState({
     unit_name: unit?.unit_name || '',
     floor: unit?.floor != null ? String(unit.floor) : '',
@@ -125,6 +131,12 @@ export default function UnitEditorModal({ listingId, basePrice, unit, onSaved, o
   const [savedUnit, setSavedUnit] = useState(unit || null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
+
+  useEffect(() => {
+    const handleKey = (e) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handleKey)
+    return () => document.removeEventListener('keydown', handleKey)
+  }, [onClose])
 
   const handleSave = async () => {
     if (!form.unit_name.trim()) { setError('Unit name is required.'); return }
@@ -141,7 +153,8 @@ export default function UnitEditorModal({ listingId, basePrice, unit, onSaved, o
       status: form.status,
     }
     let result
-    if (isEdit && savedUnit) {
+    if (savedUnit) {
+      // update existing unit (works for both initial edit and after first insert)
       const { data, error: err } = await supabase.from('listing_units').update(payload).eq('id', savedUnit.id).select().single()
       if (err) { setError(err.message); setSaving(false); return }
       result = data
@@ -159,17 +172,30 @@ export default function UnitEditorModal({ listingId, basePrice, unit, onSaved, o
   const handleToggleRented = async () => {
     if (!savedUnit) return
     const next = savedUnit.status === 'rented' ? 'available' : 'rented'
-    await supabase.from('listing_units').update({ status: next }).eq('id', savedUnit.id)
-    setSavedUnit(prev => ({ ...prev, status: next }))
-    onSaved({ ...savedUnit, status: next })
+    const { error } = await supabase.from('listing_units').update({ status: next }).eq('id', savedUnit.id)
+    if (error) return
+    const updated = { ...savedUnit, status: next }
+    setSavedUnit(updated)
+    onSaved(updated)
   }
 
   const basePricePlaceholder = basePrice ? `base $${basePrice}` : 'listing base price'
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center px-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
-        <h3 className="font-semibold text-gray-900 mb-4">{isEdit ? 'Edit Unit' : 'Add Unit'}</h3>
+    <div
+      className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center px-4"
+      onClick={onClose}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="unit-modal-title"
+        className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto"
+        onClick={e => e.stopPropagation()}
+      >
+        <h3 id="unit-modal-title" className="font-semibold text-gray-900 mb-4">
+          {savedUnit && unit ? 'Edit Unit' : savedUnit ? 'Edit Unit' : 'Add Unit'}
+        </h3>
 
         <div className="space-y-3">
           <div>
@@ -199,7 +225,7 @@ export default function UnitEditorModal({ listingId, basePrice, unit, onSaved, o
             </div>
             <div>
               <label className={labelClass}>Price/mo</label>
-              <input className={inputClass} type="number" placeholder={basePricePlaceholder}
+              <input className={inputClass} type="number" min={0} placeholder={basePricePlaceholder}
                 value={form.price} onChange={e => setForm(p => ({ ...p, price: e.target.value }))} />
             </div>
           </div>

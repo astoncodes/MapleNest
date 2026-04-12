@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 
 const inputClass = "w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
@@ -10,6 +10,12 @@ export default function BulkAddModal({ listingId, existingCount, onSaved, onClos
   const [roomRental, setRoomRental] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
+
+  useEffect(() => {
+    const handleKey = (e) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handleKey)
+    return () => document.removeEventListener('keydown', handleKey)
+  }, [onClose])
 
   const handleSave = async () => {
     const n = parseInt(count)
@@ -29,9 +35,18 @@ export default function BulkAddModal({ listingId, existingCount, onSaved, onClos
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center px-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 space-y-4">
-        <h3 className="font-semibold text-gray-900">Bulk Add Units</h3>
+    <div
+      className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center px-4"
+      onClick={onClose}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="bulk-modal-title"
+        className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 space-y-4"
+        onClick={e => e.stopPropagation()}
+      >
+        <h3 id="bulk-modal-title" className="font-semibold text-gray-900">Bulk Add Units</h3>
 
         <div>
           <label className={labelClass}>How many units?</label>
