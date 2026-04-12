@@ -45,7 +45,9 @@ export default function MessagesInboxPage() {
         id, last_message, last_message_at, renter_unread, landlord_unread,
         listing:listing_id(id, title, city, listing_images(url, is_primary)),
         renter:renter_id(id, full_name, avatar_url, email),
-        landlord:landlord_id(id, full_name, avatar_url, email)
+        landlord:landlord_id(id, full_name, avatar_url, email),
+        unit:unit_id(id, unit_name),
+        room:room_id(id, room_name)
       `)
       .or(`renter_id.eq.${user.id},landlord_id.eq.${user.id}`)
       .not('last_message', 'is', null)
@@ -106,6 +108,8 @@ export default function MessagesInboxPage() {
                   </div>
                   <p className="text-xs text-gray-500 truncate mt-0.5">
                     {convo.listing?.title || 'Listing'}
+                    {convo.unit?.unit_name ? ` · ${convo.unit.unit_name}` : ''}
+                    {convo.room?.room_name ? ` / ${convo.room.room_name}` : ''}
                     {convo.listing?.city ? ` · ${convo.listing.city}` : ''}
                   </p>
                   <p className={`text-xs truncate mt-0.5 ${unread > 0 ? 'text-gray-800 font-medium' : 'text-gray-400'}`}>
