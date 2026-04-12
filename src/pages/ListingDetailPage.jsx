@@ -243,9 +243,8 @@ export default function ListingDetailPage() {
 
   const handleUnitRequest = async ({ unitId, unitName, roomId, roomName }) => {
     if (!user) { navigate('/login'); return }
+    if (user.id === listing.landlord_id) return
 
-    setContacting(true)
-    setContactError(null)
     try {
       const { data: existing } = await supabase
         .from('conversations')
@@ -269,9 +268,8 @@ export default function ListingDetailPage() {
         },
       })
     } catch {
-      setContactError('Could not open conversation. Please try again.')
-    } finally {
-      setContacting(false)
+      // navigation always happens on success; errors here are transient
+      console.error('handleUnitRequest: failed to check existing conversation')
     }
   }
 

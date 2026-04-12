@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { useSavedListings } from '../hooks/useSavedListings'
-import UnitStrip, { resolveLowestPrice } from '../components/listings/UnitStrip'
+import UnitStrip, { resolveLowestPrice, countAvailable } from '../components/listings/UnitStrip'
 
 const CITIES = ['All', 'Charlottetown', 'Summerside', 'Cornwall', 'Stratford', 'Other']
 const TYPES = ['All', 'apartment', 'house', 'room', 'basement', 'condo', 'townhouse', 'sublease']
@@ -25,9 +25,9 @@ function ListingCard({ listing, isSaved, onToggleSave }) {
   const image = listing.listing_images?.[0]?.url
   const formatPrice = (p) => `$${Number(p || 0).toLocaleString()}`
   const units = listing.listing_units || []
-  const hasUnits = units.length > 0
-  const displayPrice = hasUnits ? resolveLowestPrice(units, listing.price) : listing.price
-  const pricePrefix = hasUnits ? 'From ' : ''
+  const hasAvailableUnits = countAvailable(units) > 0
+  const displayPrice = hasAvailableUnits ? resolveLowestPrice(units, listing.price) : listing.price
+  const pricePrefix = hasAvailableUnits ? 'From ' : ''
 
   return (
     <Link to={`/listings/${listing.id}`} className="group bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-all overflow-hidden">
@@ -130,7 +130,7 @@ export default function ListingsPage() {
   try {
     let query = supabase
       .from('listings')
-      .select('*, listing_images(url, is_primary, sort_order), listing_units(id, unit_name, price, status, room_rental, listing_unit_rooms(id, status))')
+      .select('*, listing_images(url, is_primary, sort_order), listing_units(id, unit_name, price, status, room_rental, listing_unit_rooms(id, price, status))')
       .eq('status', 'active')
       .order('created_at', { ascending: false });
 
