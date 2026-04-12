@@ -109,7 +109,7 @@ export default function MessagesInboxPage() {
                   <p className="text-xs text-gray-500 truncate mt-0.5">
                     {convo.listing?.title || 'Listing'}
                     {convo.unit?.unit_name ? ` · ${convo.unit.unit_name}` : ''}
-                    {convo.room?.room_name ? ` / ${convo.room.room_name}` : ''}
+                    {convo.unit?.unit_name && convo.room?.room_name ? ` / ${convo.room.room_name}` : ''}
                     {convo.listing?.city ? ` · ${convo.listing.city}` : ''}
                   </p>
                   <p className={`text-xs truncate mt-0.5 ${unread > 0 ? 'text-gray-800 font-medium' : 'text-gray-400'}`}>

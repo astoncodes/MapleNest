@@ -113,12 +113,17 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
           .select('*, listing_unit_rooms(*)')
           .eq('listing_id', listing.id)
           .order('sort_order')
-          .then(({ data }) => setUnits(data || []))
+          .then(({ data, error }) => { if (!error) setUnits(data || []) })
       }
     }
   }, [mode, listing])
 
   const update = (field, value) => setForm(prev => ({ ...prev, [field]: value }))
+
+  const handleDeleteUnit = async (unitId) => {
+    const { error } = await supabase.from('listing_units').delete().eq('id', unitId)
+    if (!error) setUnits(prev => prev.filter(u => u.id !== unitId))
+  }
 
   const handlePhotos = (e) => {
     const newFiles = Array.from(e.target.files)
@@ -690,10 +695,7 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
                         {!isRented && (
                           <button
                             type="button"
-                            onClick={async () => {
-                              await supabase.from('listing_units').delete().eq('id', unit.id)
-                              setUnits(prev => prev.filter(u => u.id !== unit.id))
-                            }}
+                            onClick={() => handleDeleteUnit(unit.id)}
                             className="text-gray-400 hover:text-gray-600"
                           >
                             ✕

@@ -28,7 +28,7 @@ export default function ConversationPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const isNew = id === 'new'
-  const newConvoState = location.state // { listingId, landlordId, listing, landlord }
+  const newConvoState = location.state // { listingId, landlordId, listing, landlord, unitId?, unitName?, roomId?, roomName? }
 
   const [conversation, setConversation] = useState(null)
   const conversationRef = useRef(null)
@@ -148,7 +148,9 @@ export default function ConversationPage() {
         id, renter_id, landlord_id, renter_unread, landlord_unread,
         listing:listing_id(id, title, city, listing_images(url, is_primary)),
         renter:renter_id(id, full_name, avatar_url, email),
-        landlord:landlord_id(id, full_name, avatar_url, email)
+        landlord:landlord_id(id, full_name, avatar_url, email),
+        unit:unit_id(id, unit_name),
+        room:room_id(id, room_name)
       `)
       .eq('id', id)
       .single()

@@ -194,7 +194,7 @@ export default function UnitEditorModal({ listingId, basePrice, unit, onSaved, o
         onClick={e => e.stopPropagation()}
       >
         <h3 id="unit-modal-title" className="font-semibold text-gray-900 mb-4">
-          {savedUnit && unit ? 'Edit Unit' : savedUnit ? 'Edit Unit' : 'Add Unit'}
+          {savedUnit ? 'Edit Unit' : 'Add Unit'}
         </h3>
 
         <div className="space-y-3">
