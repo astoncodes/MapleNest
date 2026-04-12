@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { useSavedListings } from '../hooks/useSavedListings'
+import UnitStrip, { resolveLowestPrice } from '../components/listings/UnitStrip'
 
 const CITIES = ['All', 'Charlottetown', 'Summerside', 'Cornwall', 'Stratford', 'Other']
 const TYPES = ['All', 'apartment', 'house', 'room', 'basement', 'condo', 'townhouse', 'sublease']
@@ -23,7 +24,10 @@ function ListingCard({ listing, isSaved, onToggleSave }) {
   if (!listing) return null
   const image = listing.listing_images?.[0]?.url
   const formatPrice = (p) => `$${Number(p || 0).toLocaleString()}`
-
+  const units = listing.listing_units || []
+  const hasUnits = units.length > 0
+  const displayPrice = hasUnits ? resolveLowestPrice(units, listing.price) : listing.price
+  const pricePrefix = hasUnits ? 'From ' : ''
 
   return (
     <Link to={`/listings/${listing.id}`} className="group bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-all overflow-hidden">
@@ -60,7 +64,9 @@ function ListingCard({ listing, isSaved, onToggleSave }) {
           <h3 className="font-semibold text-gray-900 text-sm leading-tight line-clamp-2 group-hover:text-red-700 transition-colors">
             {listing.title}
           </h3>
-          <span className="text-red-700 font-bold text-sm whitespace-nowrap">{formatPrice(listing.price)}<span className="text-gray-400 font-normal">/mo</span></span>
+          <span className="text-red-700 font-bold text-sm whitespace-nowrap">
+                {pricePrefix}{formatPrice(displayPrice)}<span className="text-gray-400 font-normal">/mo</span>
+              </span>
         </div>
 
         <p className="text-xs text-gray-500 mb-3">
@@ -73,6 +79,8 @@ function ListingCard({ listing, isSaved, onToggleSave }) {
           {listing.pet_friendly && <span>🐾 Pets ok</span>}
           {listing.parking_available && <span>🚗 Parking</span>}
         </div>
+
+        <UnitStrip units={units} />
 
         {listing.created_at && (
           <div className="flex items-center justify-between pt-2 mt-2 border-t border-gray-50 text-xs text-gray-400">
@@ -122,7 +130,7 @@ export default function ListingsPage() {
   try {
     let query = supabase
       .from('listings')
-      .select('*, listing_images(url, is_primary, sort_order)')
+      .select('*, listing_images(url, is_primary, sort_order), listing_units(id, unit_name, price, status, room_rental, listing_unit_rooms(id, status))')
       .eq('status', 'active')
       .order('created_at', { ascending: false });
 
