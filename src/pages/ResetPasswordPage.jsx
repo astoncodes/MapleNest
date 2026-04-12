@@ -120,7 +120,7 @@ export default function ResetPasswordPage() {
                 className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
               />
               {confirm && password !== confirm && (
-                <p className="text-xs text-red-600 mt-1">Passwords don't match</p>
+                <p className="text-xs text-red-600 mt-1">Passwords don&apos;t match</p>
               )}
               {confirm && password === confirm && confirm.length >= 6 && (
                 <p className="text-xs text-green-600 mt-1">✓ Passwords match</p>

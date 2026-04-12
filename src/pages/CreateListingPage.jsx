@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
@@ -53,6 +53,7 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
 
   const [photos, setPhotos] = useState([])           // File objects
   const [photoPreviewUrls, setPhotoPreviewUrls] = useState([])
+  const photoPreviewUrlsRef = useRef([])
 
   const [form, setForm] = useState({
     title: '',
@@ -74,9 +75,13 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
     furnished: false,
   })
 
+  useEffect(() => {
+    photoPreviewUrlsRef.current = photoPreviewUrls
+  }, [photoPreviewUrls])
+
   // Revoke all object URLs when the component unmounts to prevent memory leaks
   useEffect(() => {
-    return () => { photoPreviewUrls.forEach(url => URL.revokeObjectURL(url)) }
+    return () => { photoPreviewUrlsRef.current.forEach(url => URL.revokeObjectURL(url)) }
   }, [])
 
   useEffect(() => {
@@ -168,19 +173,22 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
 
   const uploadPhotos = async (listingId, sortOffset = 0) => {
     const uploadedImages = []
+    let failedCount = 0
+    let skippedCount = 0
+
     for (let i = 0; i < photos.length; i++) {
       const file = photos[i]
       setUploadProgress(`Uploading photo ${i + 1} of ${photos.length}...`)
 
       // Validate file type
       if (!file.type.startsWith('image/')) {
-        console.warn(`Skipping non-image file: ${file.name}`)
+        skippedCount += 1
         continue
       }
 
       // Validate file size (10MB max)
       if (file.size > 10 * 1024 * 1024) {
-        console.warn(`Skipping oversized file: ${file.name}`)
+        skippedCount += 1
         continue
       }
 
@@ -197,8 +205,7 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
         })
 
       if (uploadError) {
-        console.error(`Upload failed for photo ${i + 1}:`, uploadError.message)
-        // Don't throw — keep uploading remaining photos
+        failedCount += 1
         continue
       }
 
@@ -221,12 +228,13 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
         .insert(uploadedImages)
 
       if (insertError) {
-        console.error('Failed to save image records:', insertError.message)
+        setUploadProgress(null)
+        throw new Error('Photos uploaded, but we could not attach them to the listing. Please try again.')
       }
     }
 
     setUploadProgress(null)
-    return uploadedImages.length
+    return { uploadedCount: uploadedImages.length, failedCount, skippedCount }
   }
 
   const handleSubmit = async () => {
@@ -235,6 +243,22 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
 
     try {
       let listingId
+      const finishSave = (savedListingId, message) => {
+        if (message) {
+          setError(message)
+          setTimeout(() => {
+            if (onSubmitSuccess) onSubmitSuccess()
+            else navigate(`/listings/${savedListingId}`)
+          }, 2500)
+          return
+        }
+
+        if (onSubmitSuccess) {
+          onSubmitSuccess()
+        } else {
+          navigate(`/listings/${savedListingId}`)
+        }
+      }
 
       if (mode === 'edit') {
         const { error: updateError } = await supabase
@@ -265,9 +289,22 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
 
         // Delete removed images from DB and storage
         if (removedImageIds.length > 0) {
-          await supabase.from('listing_images').delete().in('id', removedImageIds)
+          const { error: deleteImagesError } = await supabase
+            .from('listing_images')
+            .delete()
+            .in('id', removedImageIds)
+          if (deleteImagesError) {
+            throw new Error('Listing saved, but removed photos could not be updated. Please try again.')
+          }
+
           if (removedImagePaths.length > 0) {
-            await supabase.storage.from('listing-images').remove(removedImagePaths)
+            const { error: removeStorageError } = await supabase
+              .storage
+              .from('listing-images')
+              .remove(removedImagePaths)
+            if (removeStorageError) {
+              throw new Error('Listing saved, but removed photos could not be deleted from storage. Please try again.')
+            }
           }
         }
       } else {
@@ -302,24 +339,20 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
       }
 
       // Upload any new photos
+      let photoMessage = null
       if (photos.length > 0) {
         const sortOffset = existingImages.length
-        const uploaded = await uploadPhotos(listingId, sortOffset)
-        if (uploaded === 0 && photos.length > 0) {
-          setError('Listing saved but new photos failed to upload. You can try again from Edit.')
-          setTimeout(() => {
-            if (onSubmitSuccess) onSubmitSuccess()
-            else navigate(`/listings/${listingId}`)
-          }, 2500)
-          return
+        const { uploadedCount, failedCount, skippedCount } = await uploadPhotos(listingId, sortOffset)
+        const incompleteCount = failedCount + skippedCount
+
+        if (uploadedCount === 0 && incompleteCount > 0) {
+          photoMessage = 'Listing saved, but all photo uploads failed. You can try again from Edit.'
+        } else if (incompleteCount > 0) {
+          photoMessage = 'Listing saved, but some photos failed to upload. You can try again from Edit.'
         }
       }
 
-      if (onSubmitSuccess) {
-        onSubmitSuccess()
-      } else {
-        navigate(`/listings/${listingId}`)
-      }
+      finishSave(listingId, photoMessage)
     } catch (err) {
       console.error('Listing submit failed:', err)
       setError(err.message || 'Something went wrong. Please try again.')
@@ -667,7 +700,7 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
 
             {mode === 'create' && (
               <div className="bg-amber-50 border border-amber-200 text-amber-800 text-sm px-4 py-3 rounded-lg">
-                Units can be added after publishing your listing. Click "Publish Listing" then use Edit to add units.
+                Units can be added after publishing your listing. Click &quot;Publish Listing&quot; then use Edit to add units.
               </div>
             )}
 

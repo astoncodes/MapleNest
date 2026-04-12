@@ -22,7 +22,7 @@ export default function Navbar() {
         }, 0)
         setUnreadCount(total)
       })
-  }, [user?.id])
+  }, [user])
 
   const handleSignOut = async () => {
     await signOut()

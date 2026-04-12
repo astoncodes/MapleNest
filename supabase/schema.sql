@@ -347,6 +347,18 @@ CREATE POLICY "Participants can mark messages read" ON public.messages
     )
   );
 
+DROP POLICY IF EXISTS "Reviews are publicly viewable" ON public.reviews;
+DROP POLICY IF EXISTS "Authenticated users can create reviews" ON public.reviews;
+CREATE POLICY "Reviews are publicly viewable" ON public.reviews
+  FOR SELECT
+  USING (true);
+CREATE POLICY "Authenticated users can create reviews" ON public.reviews
+  FOR INSERT
+  WITH CHECK (
+    auth.uid() = reviewer_id
+    AND reviewer_id <> reviewee_id
+  );
+
 DROP POLICY IF EXISTS "Authenticated users can submit reports" ON public.reports;
 CREATE POLICY "Authenticated users can submit reports" ON public.reports
   FOR INSERT
@@ -415,6 +427,72 @@ $$;
 GRANT EXECUTE ON FUNCTION public.increment_views(uuid) TO authenticated, anon;
 
 -- =============================================
+-- STORAGE POLICIES
+-- =============================================
+
+DROP POLICY IF EXISTS "Listing images are publicly readable" ON storage.objects;
+DROP POLICY IF EXISTS "Users can upload own listing images" ON storage.objects;
+DROP POLICY IF EXISTS "Users can update own listing images" ON storage.objects;
+DROP POLICY IF EXISTS "Users can delete own listing images" ON storage.objects;
+DROP POLICY IF EXISTS "Users can upload own avatars" ON storage.objects;
+DROP POLICY IF EXISTS "Users can update own avatars" ON storage.objects;
+DROP POLICY IF EXISTS "Users can delete own avatars" ON storage.objects;
+
+CREATE POLICY "Listing images are publicly readable" ON storage.objects
+  FOR SELECT
+  USING (bucket_id = 'listing-images');
+
+CREATE POLICY "Users can upload own listing images" ON storage.objects
+  FOR INSERT
+  WITH CHECK (
+    bucket_id = 'listing-images'
+    AND name LIKE auth.uid()::text || '/%'
+  );
+
+CREATE POLICY "Users can update own listing images" ON storage.objects
+  FOR UPDATE
+  USING (
+    bucket_id = 'listing-images'
+    AND name LIKE auth.uid()::text || '/%'
+  )
+  WITH CHECK (
+    bucket_id = 'listing-images'
+    AND name LIKE auth.uid()::text || '/%'
+  );
+
+CREATE POLICY "Users can delete own listing images" ON storage.objects
+  FOR DELETE
+  USING (
+    bucket_id = 'listing-images'
+    AND name LIKE auth.uid()::text || '/%'
+  );
+
+CREATE POLICY "Users can upload own avatars" ON storage.objects
+  FOR INSERT
+  WITH CHECK (
+    bucket_id = 'listing-images'
+    AND name LIKE 'avatars/' || auth.uid()::text || '.%'
+  );
+
+CREATE POLICY "Users can update own avatars" ON storage.objects
+  FOR UPDATE
+  USING (
+    bucket_id = 'listing-images'
+    AND name LIKE 'avatars/' || auth.uid()::text || '.%'
+  )
+  WITH CHECK (
+    bucket_id = 'listing-images'
+    AND name LIKE 'avatars/' || auth.uid()::text || '.%'
+  );
+
+CREATE POLICY "Users can delete own avatars" ON storage.objects
+  FOR DELETE
+  USING (
+    bucket_id = 'listing-images'
+    AND name LIKE 'avatars/' || auth.uid()::text || '.%'
+  );
+
+-- =============================================
 -- INDEXES
 -- =============================================
 
@@ -428,6 +506,9 @@ CREATE INDEX IF NOT EXISTS saved_listings_user_id_idx
   ON public.saved_listings(user_id);
 CREATE INDEX IF NOT EXISTS saved_listings_listing_id_idx
   ON public.saved_listings(listing_id);
+CREATE UNIQUE INDEX IF NOT EXISTS reviews_profile_unique_idx
+  ON public.reviews(reviewer_id, reviewee_id)
+  WHERE listing_id IS NULL;
 CREATE INDEX IF NOT EXISTS idx_listing_units_listing_id
   ON public.listing_units (listing_id);
 CREATE INDEX IF NOT EXISTS idx_listing_units_listing_id_sort_order
@@ -474,4 +555,3 @@ CREATE POLICY "listing_unit_rooms_public_read" ON public.listing_unit_rooms FOR 
 CREATE POLICY "listing_unit_rooms_landlord_write" ON public.listing_unit_rooms FOR ALL
   USING (auth.uid() = (SELECT l.landlord_id FROM public.listings l JOIN public.listing_units lu ON lu.listing_id = l.id WHERE lu.id = unit_id))
   WITH CHECK (auth.uid() = (SELECT l.landlord_id FROM public.listings l JOIN public.listing_units lu ON lu.listing_id = l.id WHERE lu.id = unit_id));
-

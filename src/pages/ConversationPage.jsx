@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Link, useParams, useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
@@ -46,101 +46,7 @@ export default function ConversationPage() {
     conversationRef.current = conversation
   }, [conversation])
 
-  // Initialize: either fetch existing conversation or set up from router state
-  useEffect(() => {
-    if (isNew) {
-      if (!newConvoState?.listingId) { navigate('/messages'); return }
-      setConversation({
-        id: null,
-        renter_id: user.id,
-        landlord_id: newConvoState.landlordId,
-        listing: newConvoState.listing,
-        landlord: newConvoState.landlord,
-        renter: user?.profile,
-      })
-      // Pre-fill message with unit/room context
-      if (newConvoState.unitName) {
-        const roomPart = newConvoState.roomName
-          ? ` (${newConvoState.roomName})`
-          : ''
-        setNewMessage(`Hi, I'm interested in ${newConvoState.unitName}${roomPart} — is it still available?`)
-      }
-      setLoading(false)
-      return
-    }
-    if (user) fetchConversation()
-  }, [id, user?.id])
-
-  // Scroll to bottom when messages change
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
-
-  // Real-time subscription for new messages from the other party
-  useEffect(() => {
-    if (!id || isNew || !user) return
-    const channel = supabase
-      .channel(`messages-${id}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${id}` },
-        async (payload) => {
-          if (payload.new.sender_id === user.id) return
-          const { data: msg } = await supabase
-            .from('messages')
-            .select('id, content, created_at, read, sender_id, sender:sender_id(id, full_name, avatar_url, email)')
-            .eq('id', payload.new.id)
-            .single()
-          if (msg) {
-            setMessages(prev => {
-              if (prev.some(m => m.id === msg.id)) return prev
-              lastMessageAtRef.current = msg.created_at
-              return [...prev, msg]
-            })
-            supabase.from('messages').update({ read: true }).eq('id', msg.id)
-            const convo = conversationRef.current
-            if (convo) {
-              const myUnreadField = user.id === convo.renter_id ? 'renter_unread' : 'landlord_unread'
-              supabase.from('conversations').update({ [myUnreadField]: 0 }).eq('id', convo.id)
-              setConversation(prev => prev ? { ...prev, [myUnreadField]: 0 } : prev)
-            }
-          }
-        }
-      )
-      .subscribe()
-    return () => { supabase.removeChannel(channel) }
-  }, [id, user?.id])
-
-  // Polling fallback — catches messages real-time misses (e.g. replication not enabled)
-  useEffect(() => {
-    if (!id || isNew || !user) return
-    const poll = setInterval(async () => {
-      const since = lastMessageAtRef.current
-      if (!since) return
-      const { data } = await supabase
-        .from('messages')
-        .select('id, content, created_at, read, sender_id, sender:sender_id(id, full_name, avatar_url, email)')
-        .eq('conversation_id', id)
-        .gt('created_at', since)
-        .order('created_at', { ascending: true })
-      if (!data?.length) return
-      setMessages(prev => {
-        const existingIds = new Set(prev.map(m => m.id))
-        const incoming = data.filter(m => !existingIds.has(m.id))
-        if (!incoming.length) return prev
-        lastMessageAtRef.current = data[data.length - 1].created_at
-        // Mark other party's new messages as read
-        const others = incoming.filter(m => m.sender_id !== user.id)
-        if (others.length) {
-          supabase.from('messages').update({ read: true }).in('id', others.map(m => m.id))
-        }
-        return [...prev, ...incoming]
-      })
-    }, 5000)
-    return () => clearInterval(poll)
-  }, [id, user?.id])
-
-  const fetchConversation = async () => {
+  const fetchConversation = useCallback(async () => {
     setLoading(true)
     const { data: convo, error: convoErr } = await supabase
       .from('conversations')
@@ -182,7 +88,100 @@ export default function ConversationPage() {
 
     const unreadField = user.id === convo.renter_id ? 'renter_unread' : 'landlord_unread'
     await supabase.from('conversations').update({ [unreadField]: 0 }).eq('id', id)
-  }
+  }, [id, navigate, user])
+
+  // Initialize: either fetch existing conversation or set up from router state
+  useEffect(() => {
+    if (isNew) {
+      if (!newConvoState?.listingId) { navigate('/messages'); return }
+      setConversation({
+        id: null,
+        renter_id: user.id,
+        landlord_id: newConvoState.landlordId,
+        listing: newConvoState.listing,
+        landlord: newConvoState.landlord,
+        renter: user?.profile,
+      })
+      if (newConvoState.unitName) {
+        const roomPart = newConvoState.roomName
+          ? ` (${newConvoState.roomName})`
+          : ''
+        setNewMessage(`Hi, I'm interested in ${newConvoState.unitName}${roomPart} — is it still available?`)
+      }
+      setLoading(false)
+      return
+    }
+    if (user) fetchConversation()
+  }, [fetchConversation, id, isNew, navigate, newConvoState, user])
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
+
+  // Real-time subscription for new messages from the other party
+  useEffect(() => {
+    if (!id || isNew || !user) return
+    const channel = supabase
+      .channel(`messages-${id}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${id}` },
+        async (payload) => {
+          if (payload.new.sender_id === user.id) return
+          const { data: msg } = await supabase
+            .from('messages')
+            .select('id, content, created_at, read, sender_id, sender:sender_id(id, full_name, avatar_url, email)')
+            .eq('id', payload.new.id)
+            .single()
+          if (msg) {
+            setMessages(prev => {
+              if (prev.some(m => m.id === msg.id)) return prev
+              lastMessageAtRef.current = msg.created_at
+              return [...prev, msg]
+            })
+            supabase.from('messages').update({ read: true }).eq('id', msg.id)
+            const convo = conversationRef.current
+            if (convo) {
+              const myUnreadField = user.id === convo.renter_id ? 'renter_unread' : 'landlord_unread'
+              supabase.from('conversations').update({ [myUnreadField]: 0 }).eq('id', convo.id)
+              setConversation(prev => prev ? { ...prev, [myUnreadField]: 0 } : prev)
+            }
+          }
+        }
+      )
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [id, isNew, user])
+
+  // Polling fallback — catches messages real-time misses (e.g. replication not enabled)
+  useEffect(() => {
+    if (!id || isNew || !user) return
+    const poll = setInterval(async () => {
+      const since = lastMessageAtRef.current
+      if (!since) return
+      const { data } = await supabase
+        .from('messages')
+        .select('id, content, created_at, read, sender_id, sender:sender_id(id, full_name, avatar_url, email)')
+        .eq('conversation_id', id)
+        .gt('created_at', since)
+        .order('created_at', { ascending: true })
+      if (!data?.length) return
+      setMessages(prev => {
+        const existingIds = new Set(prev.map(m => m.id))
+        const incoming = data.filter(m => !existingIds.has(m.id))
+        if (!incoming.length) return prev
+        lastMessageAtRef.current = data[data.length - 1].created_at
+        // Mark other party's new messages as read
+        const others = incoming.filter(m => m.sender_id !== user.id)
+        if (others.length) {
+          supabase.from('messages').update({ read: true }).in('id', others.map(m => m.id))
+        }
+        return [...prev, ...incoming]
+      })
+    }, 5000)
+    return () => clearInterval(poll)
+  }, [id, isNew, user])
 
   const handleSend = async (e) => {
     e.preventDefault()

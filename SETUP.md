@@ -16,8 +16,10 @@ git push -u origin main
 1. Go to [supabase.com](https://supabase.com) → New Project
 2. Name it `maplenest`, choose **Canada (Central)** region
 3. Copy your **Project URL** and **anon public key**
-4. Go to **SQL Editor** → paste and run `supabase/schema.sql`
-5. Go to **Storage** → create a bucket called `listing-images` (public)
+4. Go to **Storage** → create a bucket called `listing-images` (public)
+5. Go to **SQL Editor** → paste and run `supabase/schema.sql`
+
+If you already ran the schema before creating storage policies, run the SQL files in `supabase/migration_*.sql` from the SQL Editor.
 
 ## 3. Configure Environment
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
@@ -118,13 +118,9 @@ export default function ListingsPage() {
 
   useEffect(() => {
     setSearch(queryFromParams || '')
-  }, [searchParams])
+  }, [queryFromParams])
 
-  useEffect(() => {
-    fetchListings()
-  }, [filters, queryFromParams])
-
-  const fetchListings = async () => {
+  const fetchListings = useCallback(async () => {
   setLoading(true);
 
   try {
@@ -177,7 +173,11 @@ export default function ListingsPage() {
   } finally {
     setLoading(false);
   }
-};
+}, [filters, queryFromParams]);
+
+  useEffect(() => {
+    fetchListings()
+  }, [fetchListings])
   const handleSearch = (e) => {
     e.preventDefault()
     const next = search.trim()

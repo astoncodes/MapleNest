@@ -35,7 +35,7 @@ export default function ForgotPasswordPage() {
             We sent a password reset link to <strong>{email}</strong>. 
             Click the link in the email to set a new password.
           </p>
-          <p className="text-xs text-gray-400 mb-4">Didn't get it? Check your spam folder.</p>
+          <p className="text-xs text-gray-400 mb-4">Didn&apos;t get it? Check your spam folder.</p>
           <button onClick={() => setSent(false)}
             className="text-red-700 text-sm font-medium hover:underline">
             Try a different email
@@ -52,7 +52,7 @@ export default function ForgotPasswordPage() {
           <span className="text-4xl">🍁</span>
           <h1 className="text-2xl font-bold text-gray-800 mt-2">Forgot your password?</h1>
           <p className="text-gray-500 text-sm mt-1">
-            Enter your email and we'll send you a reset link
+            Enter your email and we&apos;ll send you a reset link
           </p>
         </div>
 

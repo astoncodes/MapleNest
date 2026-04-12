@@ -31,7 +31,7 @@ export function useSavedListings() {
         setLoading(false)
       })
     return () => { cancelled = true }
-  }, [user?.id])
+  }, [user])
 
   const isSaved = useCallback((listingId) => savedIds.has(listingId), [savedIds])
 

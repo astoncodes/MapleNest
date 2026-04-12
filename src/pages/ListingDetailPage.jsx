@@ -170,11 +170,7 @@ export default function ListingDetailPage() {
   const [reportDone, setReportDone] = useState(false)
   const [reportError, setReportError] = useState(null)
 
-  useEffect(() => {
-    fetchListing()
-  }, [id])
-
-  const fetchListing = async () => {
+  const fetchListing = useCallback(async () => {
     const { data, error } = await supabase
       .from('listings')
       .select('*, listing_images(id, url, is_primary, sort_order), listing_units(id, unit_name, floor, price, available_from, notes, status, room_rental, sort_order, listing_unit_rooms(id, room_name, price, available_from, status, sort_order))')
@@ -205,7 +201,11 @@ export default function ListingDetailPage() {
 
     // Atomic increment — avoids race condition under concurrent views
     supabase.rpc('increment_views', { p_listing_id: id })
-  }
+  }, [id, navigate])
+
+  useEffect(() => {
+    fetchListing()
+  }, [fetchListing])
 
   const handleContact = async () => {
     if (!user) { navigate('/login'); return }

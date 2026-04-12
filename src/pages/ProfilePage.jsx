@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
@@ -102,6 +102,7 @@ export default function ProfilePage() {
 
   // Avatar upload
   const [avatarUploading, setAvatarUploading] = useState(false)
+  const [avatarError, setAvatarError] = useState(null)
 
   // Leave review state
   const [reviewForm, setReviewForm] = useState({ rating: 0, comment: '' })
@@ -110,12 +111,7 @@ export default function ProfilePage() {
   const [reviewSuccess, setReviewSuccess] = useState(false)
   const [hasReviewed, setHasReviewed] = useState(false)
 
-  useEffect(() => {
-    if (!viewingId) return
-    fetchAll()
-  }, [viewingId, user?.id])
-
-  const fetchAll = async () => {
+  const fetchAll = useCallback(async () => {
     setLoading(true)
     try {
       const [{ data: prof }, { data: listData }, { data: revData }, { data: savedData }] = await Promise.all([
@@ -138,7 +134,12 @@ export default function ProfilePage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [isOwn, user, viewingId])
+
+  useEffect(() => {
+    if (!viewingId) return
+    fetchAll()
+  }, [fetchAll, viewingId])
 
   // ── Save profile edits ───────────────────────────────────────────────────
   const handleSaveProfile = async () => {
@@ -161,14 +162,25 @@ export default function ProfilePage() {
     const file = e.target.files[0]
     if (!file) return
     setAvatarUploading(true)
-    const ext = file.name.split('.').pop()
-    const path = `avatars/${user.id}.${ext}`
-    const { error: uploadErr } = await supabase.storage.from('listing-images').upload(path, file, { upsert: true })
-    if (uploadErr) { setAvatarUploading(false); return }
-    const { data } = supabase.storage.from('listing-images').getPublicUrl(path)
-    const { error: updateErr } = await supabase.from('profiles').update({ avatar_url: data.publicUrl }).eq('id', user.id)
-    if (!updateErr) setProfile(prev => ({ ...prev, avatar_url: data.publicUrl }))
-    setAvatarUploading(false)
+    setAvatarError(null)
+
+    try {
+      const ext = file.name.split('.').pop()
+      const path = `avatars/${user.id}.${ext}`
+      const { error: uploadError } = await supabase.storage.from('listing-images').upload(path, file, { upsert: true })
+      if (uploadError) throw uploadError
+
+      const { data } = supabase.storage.from('listing-images').getPublicUrl(path)
+      const { error: updateError } = await supabase.from('profiles').update({ avatar_url: data.publicUrl }).eq('id', user.id)
+      if (updateError) throw updateError
+
+      setProfile(prev => ({ ...prev, avatar_url: data.publicUrl }))
+    } catch (err) {
+      setAvatarError(err.message || 'Could not upload avatar. Please try again.')
+    } finally {
+      setAvatarUploading(false)
+      e.target.value = ''
+    }
   }
 
   // ── Password change ──────────────────────────────────────────────────────
@@ -199,7 +211,9 @@ export default function ProfilePage() {
       comment: reviewForm.comment,
     })
     setReviewLoading(false)
-    if (error) { setReviewError(error.message) } else {
+    if (error) {
+      setReviewError(error.code === '23505' ? 'You have already reviewed this profile.' : error.message)
+    } else {
       setReviewSuccess(true); setHasReviewed(true)
       setReviewForm({ rating: 0, comment: '' })
       fetchAll()
@@ -321,6 +335,7 @@ export default function ProfilePage() {
           )}
 
           {saveSuccess && <p className="text-xs text-green-600 mt-2">✓ Profile updated successfully</p>}
+          {avatarError && <p className="text-xs text-red-600 mt-2">{avatarError}</p>}
         </div>
       </div>
 
@@ -505,7 +520,7 @@ export default function ProfilePage() {
                     onChange={e => setPwForm(p => ({ ...p, [f.key]: e.target.value }))}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-300" />
                   {f.key === 'confirm' && pwForm.confirm && pwForm.next !== pwForm.confirm && (
-                    <p className="text-xs text-red-500 mt-1">Passwords don't match</p>
+                    <p className="text-xs text-red-500 mt-1">Passwords don&apos;t match</p>
                   )}
                   {f.key === 'confirm' && pwForm.confirm && pwForm.next === pwForm.confirm && pwForm.next.length >= 6 && (
                     <p className="text-xs text-green-600 mt-1">✓ Passwords match</p>

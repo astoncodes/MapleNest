@@ -126,7 +126,7 @@ function RoomRentalUnit({ unit, basePrice, baseDate, onRequest = () => {}, isOwn
   )
 }
 
-export default function UnitSection({ units, basePrice, baseDate, onRequest = () => {}, isOwn, user, listingId }) {
+export default function UnitSection({ units, basePrice, baseDate, onRequest = () => {}, isOwn, listingId }) {
   if (!units || units.length === 0) return null
 
   const sorted = [...units].sort((a, b) => {

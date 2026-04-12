@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
@@ -32,12 +32,8 @@ export default function MessagesInboxPage() {
   const [conversations, setConversations] = useState([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
+  const fetchConversations = useCallback(async () => {
     if (!user) return
-    fetchConversations()
-  }, [user?.id])
-
-  const fetchConversations = async () => {
     setLoading(true)
     const { data } = await supabase
       .from('conversations')
@@ -55,7 +51,12 @@ export default function MessagesInboxPage() {
 
     setConversations(data || [])
     setLoading(false)
-  }
+  }, [user])
+
+  useEffect(() => {
+    if (!user) return
+    fetchConversations()
+  }, [fetchConversations, user])
 
   if (loading) return (
     <div className="max-w-2xl mx-auto px-4 py-10 space-y-3">
