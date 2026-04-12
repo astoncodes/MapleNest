@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { useSavedListings } from '../hooks/useSavedListings'
+import UnitSection from '../components/listings/UnitSection'
 
 const TYPE_LABELS = {
   apartment: 'Apartment', house: 'House', room: 'Room',
@@ -176,7 +177,7 @@ export default function ListingDetailPage() {
   const fetchListing = async () => {
     const { data, error } = await supabase
       .from('listings')
-      .select('*, listing_images(id, url, is_primary, sort_order)')
+      .select('*, listing_images(id, url, is_primary, sort_order), listing_units(id, unit_name, floor, price, available_from, notes, status, room_rental, sort_order, listing_unit_rooms(id, room_name, price, available_from, status, sort_order))')
       .eq('id', id)
       .single()
 
@@ -234,6 +235,40 @@ export default function ListingDetailPage() {
         },
       })
     } catch (err) {
+      setContactError('Could not open conversation. Please try again.')
+    } finally {
+      setContacting(false)
+    }
+  }
+
+  const handleUnitRequest = async ({ unitId, unitName, roomId, roomName }) => {
+    if (!user) { navigate('/login'); return }
+
+    setContacting(true)
+    setContactError(null)
+    try {
+      const { data: existing } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('listing_id', id)
+        .eq('renter_id', user.id)
+        .maybeSingle()
+
+      if (existing) { navigate(`/messages/${existing.id}`); return }
+
+      navigate('/messages/new', {
+        state: {
+          listingId: id,
+          landlordId: listing.landlord_id,
+          listing: { id, title: listing.title, city: listing.city, listing_images: listing.listing_images },
+          landlord,
+          unitId,
+          unitName,
+          roomId: roomId || null,
+          roomName: roomName || null,
+        },
+      })
+    } catch {
       setContactError('Could not open conversation. Please try again.')
     } finally {
       setContacting(false)
@@ -358,6 +393,18 @@ export default function ListingDetailPage() {
               ))}
             </div>
           </div>
+
+          {(listing.listing_units?.length > 0) && (
+            <UnitSection
+              units={listing.listing_units}
+              basePrice={listing.price}
+              baseDate={listing.available_from}
+              onRequest={handleUnitRequest}
+              isOwn={isOwnListing}
+              user={user}
+              listingId={listing.id}
+            />
+          )}
         </div>
 
         {/* Right column — contact card */}
