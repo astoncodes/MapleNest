@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
+import UnitEditorModal from '../components/listings/UnitEditorModal'
+import BulkAddModal from '../components/listings/BulkAddModal'
 
 const PEI_NEIGHBOURHOODS = {
   Charlottetown: ['Downtown', 'West Royalty', 'Brighton', 'Sherwood', 'Parkdale', 'Belvedere', 'University Avenue', 'East Royalty'],
@@ -44,6 +46,10 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
   const [existingImages, setExistingImages] = useState([])
   const [removedImageIds, setRemovedImageIds] = useState([])
   const [removedImagePaths, setRemovedImagePaths] = useState([])
+  const [units, setUnits] = useState([])
+  const [unitModalOpen, setUnitModalOpen] = useState(false)
+  const [editingUnit, setEditingUnit] = useState(null)
+  const [bulkModalOpen, setBulkModalOpen] = useState(false)
 
   const [photos, setPhotos] = useState([])           // File objects
   const [photoPreviewUrls, setPhotoPreviewUrls] = useState([])
@@ -101,6 +107,14 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
           return a.sort_order - b.sort_order
         })
       )
+      if (listing?.id) {
+        supabase
+          .from('listing_units')
+          .select('*, listing_unit_rooms(*)')
+          .eq('listing_id', listing.id)
+          .order('sort_order')
+          .then(({ data }) => setUnits(data || []))
+      }
     }
   }, [mode, listing])
 
@@ -335,7 +349,7 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
 
       {/* Step indicator */}
       <div className="flex items-center gap-2 mb-8">
-        {[1, 2, 3].map(s => (
+        {[1, 2, 3, ...(isRenter ? [] : [4])].map((s, idx, arr) => (
           <div key={s} className="flex items-center gap-2">
             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-colors ${
               s < step ? 'bg-green-500 text-white' :
@@ -345,9 +359,9 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
               {s < step ? '✓' : s}
             </div>
             <span className={`text-sm ${s === step ? 'text-gray-800 font-medium' : 'text-gray-400'}`}>
-              {s === 1 ? 'Property' : s === 2 ? 'Details' : 'Photos'}
+              {s === 1 ? 'Property' : s === 2 ? 'Details' : s === 3 ? 'Photos' : 'Units'}
             </span>
-            {s < 3 && <div className={`w-8 h-px ${s < step ? 'bg-green-400' : 'bg-gray-200'}`} />}
+            {idx < arr.length - 1 && <div className={`w-8 h-px ${s < step ? 'bg-green-400' : 'bg-gray-200'}`} />}
           </div>
         ))}
       </div>
@@ -636,6 +650,82 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
           </div>
         )}
 
+        {/* Step 4: Units (landlords only) */}
+        {step === 4 && !isRenter && (
+          <div className="space-y-4">
+            <div>
+              <h2 className="font-semibold text-gray-800 text-lg mb-1">Units</h2>
+              <p className="text-sm text-gray-500 mb-4">
+                Add individual units if this listing has multiple rentable spaces (e.g. apartments in a building, rooms in a house).
+              </p>
+            </div>
+
+            {mode === 'create' && (
+              <div className="bg-amber-50 border border-amber-200 text-amber-800 text-sm px-4 py-3 rounded-lg">
+                Units can be added after publishing your listing. Click "Publish Listing" then use Edit to add units.
+              </div>
+            )}
+
+            {mode === 'edit' && (
+              <>
+                {/* Unit chips */}
+                <div className="flex flex-wrap gap-2">
+                  {units.map(unit => {
+                    const isRented = unit.room_rental
+                      ? false
+                      : unit.status === 'rented'
+                    return (
+                      <div key={unit.id} className={`flex items-center gap-2 border rounded-lg px-3 py-1.5 text-xs ${isRented ? 'bg-gray-50 border-gray-200' : 'bg-white border-gray-200'}`}>
+                        <span className="font-medium text-gray-800">{unit.unit_name}</span>
+                        {unit.floor != null && <span className="text-gray-400">· Floor {unit.floor}</span>}
+                        {unit.price && <span className="text-gray-400">· ${unit.price}/mo</span>}
+                        {isRented && <span className="text-xs bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded-full">Rented</span>}
+                        <button
+                          type="button"
+                          onClick={() => { setEditingUnit(unit); setUnitModalOpen(true) }}
+                          className="text-red-700 font-medium hover:text-red-800"
+                        >
+                          Edit
+                        </button>
+                        {!isRented && (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              await supabase.from('listing_units').delete().eq('id', unit.id)
+                              setUnits(prev => prev.filter(u => u.id !== unit.id))
+                            }}
+                            className="text-gray-400 hover:text-gray-600"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* Add unit / Bulk add */}
+                <button
+                  type="button"
+                  onClick={() => { setEditingUnit(null); setUnitModalOpen(true) }}
+                  className="w-full border border-dashed border-gray-300 rounded-lg py-2.5 text-sm text-gray-500 hover:border-red-300 hover:text-red-700 transition"
+                >
+                  + Add unit
+                </button>
+                <div className="text-center">
+                  <button
+                    type="button"
+                    onClick={() => setBulkModalOpen(true)}
+                    className="text-xs text-red-700 font-medium hover:underline"
+                  >
+                    Bulk add multiple units
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
         {/* Navigation */}
         <div className="flex justify-between mt-8 pt-6 border-t border-gray-100">
           {step > 1 ? (
@@ -645,7 +735,7 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
             </button>
           ) : <div />}
 
-          {step < 3 ? (
+          {step < (isRenter ? 3 : 4) ? (
             <button onClick={() => setStep(s => s + 1)} disabled={!canProceed()}
               className="px-6 py-2.5 text-sm font-semibold bg-red-700 text-white rounded-lg hover:bg-red-800 transition disabled:opacity-40 disabled:cursor-not-allowed">
               Continue →
@@ -662,6 +752,31 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
           )}
         </div>
       </div>
+      {unitModalOpen && (
+        <UnitEditorModal
+          listingId={listing?.id || null}
+          basePrice={form.price ? parseInt(form.price) : null}
+          unit={editingUnit}
+          onSaved={(saved) => {
+            setUnits(prev => {
+              const idx = prev.findIndex(u => u.id === saved.id)
+              if (idx >= 0) {
+                const next = [...prev]; next[idx] = { ...prev[idx], ...saved }; return next
+              }
+              return [...prev, saved]
+            })
+          }}
+          onClose={() => { setUnitModalOpen(false); setEditingUnit(null) }}
+        />
+      )}
+      {bulkModalOpen && (
+        <BulkAddModal
+          listingId={listing?.id || null}
+          existingCount={units.length}
+          onSaved={(newUnits) => setUnits(prev => [...prev, ...newUnits])}
+          onClose={() => setBulkModalOpen(false)}
+        />
+      )}
     </div>
   )
 }
