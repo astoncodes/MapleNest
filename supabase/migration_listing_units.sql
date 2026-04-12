@@ -66,3 +66,11 @@ CREATE POLICY "listing_unit_rooms_landlord_write" ON public.listing_unit_rooms
       WHERE lu.id = unit_id
     )
   );
+
+-- Indexes
+CREATE INDEX IF NOT EXISTS idx_listing_units_listing_id
+  ON public.listing_units (listing_id);
+CREATE INDEX IF NOT EXISTS idx_listing_units_listing_id_sort_order
+  ON public.listing_units (listing_id, sort_order);
+CREATE INDEX IF NOT EXISTS idx_listing_unit_rooms_unit_id
+  ON public.listing_unit_rooms (unit_id);

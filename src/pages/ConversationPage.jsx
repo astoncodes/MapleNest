@@ -320,6 +320,8 @@ export default function ConversationPage() {
           </Link>
           <p className="text-xs text-gray-500 truncate">
             {other?.full_name || other?.email || 'User'}
+            {conversation?.unit?.unit_name ? ` · ${conversation.unit.unit_name}` : ''}
+            {conversation?.unit?.unit_name && conversation?.room?.room_name ? ` / ${conversation.room.room_name}` : ''}
             {conversation?.listing?.city ? ` · ${conversation.listing.city}` : ''}
           </p>
         </div>

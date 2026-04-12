@@ -47,7 +47,7 @@ export default function UnitStrip({ units }) {
     )
   }
 
-  const preview = available.slice(0, 2)
+  const preview = available.slice(0, 3)
   const overflow = available.length - preview.length
 
   return (

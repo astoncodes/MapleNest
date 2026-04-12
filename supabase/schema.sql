@@ -88,6 +88,8 @@ CREATE TABLE IF NOT EXISTS public.conversations (
   last_message_at TIMESTAMPTZ DEFAULT NOW(),
   renter_unread INTEGER DEFAULT 0,
   landlord_unread INTEGER DEFAULT 0,
+  unit_id uuid REFERENCES public.listing_units(id) ON DELETE SET NULL,
+  room_id uuid REFERENCES public.listing_unit_rooms(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(listing_id, renter_id)
 );
@@ -426,6 +428,12 @@ CREATE INDEX IF NOT EXISTS saved_listings_user_id_idx
   ON public.saved_listings(user_id);
 CREATE INDEX IF NOT EXISTS saved_listings_listing_id_idx
   ON public.saved_listings(listing_id);
+CREATE INDEX IF NOT EXISTS idx_listing_units_listing_id
+  ON public.listing_units (listing_id);
+CREATE INDEX IF NOT EXISTS idx_listing_units_listing_id_sort_order
+  ON public.listing_units (listing_id, sort_order);
+CREATE INDEX IF NOT EXISTS idx_listing_unit_rooms_unit_id
+  ON public.listing_unit_rooms (unit_id);
 
 -- ── listing_units ─────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.listing_units (
@@ -467,5 +475,3 @@ CREATE POLICY "listing_unit_rooms_landlord_write" ON public.listing_unit_rooms F
   USING (auth.uid() = (SELECT l.landlord_id FROM public.listings l JOIN public.listing_units lu ON lu.listing_id = l.id WHERE lu.id = unit_id))
   WITH CHECK (auth.uid() = (SELECT l.landlord_id FROM public.listings l JOIN public.listing_units lu ON lu.listing_id = l.id WHERE lu.id = unit_id));
 
--- ── conversations: unit/room context ─────────────────────────────────────────
--- Run migration_listing_units.sql to apply ALTER TABLE for conversations

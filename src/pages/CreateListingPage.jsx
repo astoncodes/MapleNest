@@ -676,15 +676,17 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
                 {/* Unit chips */}
                 <div className="flex flex-wrap gap-2">
                   {units.map(unit => {
-                    const isRented = unit.room_rental
-                      ? false
+                    const isFull = unit.room_rental
+                      ? (unit.listing_unit_rooms || []).length > 0 &&
+                        (unit.listing_unit_rooms || []).every(r => r.status === 'occupied')
                       : unit.status === 'rented'
+                    const statusLabel = unit.room_rental ? 'Full' : 'Rented'
                     return (
-                      <div key={unit.id} className={`flex items-center gap-2 border rounded-lg px-3 py-1.5 text-xs ${isRented ? 'bg-gray-50 border-gray-200' : 'bg-white border-gray-200'}`}>
+                      <div key={unit.id} className={`flex items-center gap-2 border rounded-lg px-3 py-1.5 text-xs ${isFull ? 'bg-gray-50 border-gray-200' : 'bg-white border-gray-200'}`}>
                         <span className="font-medium text-gray-800">{unit.unit_name}</span>
                         {unit.floor != null && <span className="text-gray-400">· Floor {unit.floor}</span>}
                         {unit.price && <span className="text-gray-400">· ${unit.price}/mo</span>}
-                        {isRented && <span className="text-xs bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded-full">Rented</span>}
+                        {isFull && <span className="text-xs bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded-full">{statusLabel}</span>}
                         <button
                           type="button"
                           onClick={() => { setEditingUnit(unit); setUnitModalOpen(true) }}
@@ -692,7 +694,7 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
                         >
                           Edit
                         </button>
-                        {!isRented && (
+                        {!isFull && (
                           <button
                             type="button"
                             onClick={() => handleDeleteUnit(unit.id)}
