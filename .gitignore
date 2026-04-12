@@ -22,3 +22,6 @@ npm-debug.log*
 
 # Git worktrees
 .worktrees/
+
+# Superpowers brainstorm/plan artifacts
+.superpowers/
