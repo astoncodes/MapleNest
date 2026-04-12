@@ -117,6 +117,32 @@ npm run build
 git diff --check
 ```
 
+## Merge/Rebase Update
+
+The local work was rebased onto `origin/main`, which had added the multi-unit listings feature.
+
+Current state:
+- Branch is `main...origin/main [ahead 1]`.
+- Rebased local commit is `f282f02 fix: harden Supabase policies and photo upload handling`.
+- Push has not happened yet; the previous `git push --force-with-lease origin main` approval was rejected, so the merge is local only.
+
+Conflicts resolved:
+- `src/pages/ConversationPage.jsx`: kept remote unit/room conversation metadata and prefilled request message, while keeping the local hook dependency fix.
+- `src/pages/ProfilePage.jsx`: kept the local avatar upload error handling so failed uploads clear the spinner and show an error.
+- `supabase/schema.sql`: kept remote multi-unit schema/RLS/indexes and added the local review unique index plus review/storage policy work.
+
+Post-rebase lint fixes:
+- `src/components/listings/UnitSection.jsx`: removed unused `user` prop from the component signature.
+- `src/pages/CreateListingPage.jsx`: kept the remote multi-unit editor flow, kept local photo failure handling, escaped the `"Publish Listing"` copy, and changed photo preview cleanup to use a ref so the hook dependency warning stays fixed without revoking active previews during normal state changes.
+
+Verification after the rebase passed:
+
+```bash
+npm run lint
+npm run build
+git diff --check
+```
+
 ## Manual Testing Still Recommended
 
 Run these before merging/deploying:
