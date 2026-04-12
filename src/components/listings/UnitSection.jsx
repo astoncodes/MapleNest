@@ -1,12 +1,13 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 
 const formatDate = (d) => d
   ? new Date(d).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })
   : null
 
-const formatPrice = (p) => `$${Number(p).toLocaleString()}`
+const formatPrice = (p) => p != null ? `$${Number(p).toLocaleString()}` : '—'
 
-function UnitRow({ unit, basePrice, baseDate, onRequest, isOwn, user }) {
+function UnitRow({ unit, basePrice, baseDate, onRequest = () => {}, isOwn }) {
   const price = unit.price ?? basePrice
   const date = unit.available_from ?? baseDate
   const isRented = unit.status === 'rented'
@@ -80,7 +81,7 @@ function RoomRow({ room, unitPrice, basePrice, baseDate, unitId, unitName, onReq
   )
 }
 
-function RoomRentalUnit({ unit, basePrice, baseDate, onRequest, isOwn, user }) {
+function RoomRentalUnit({ unit, basePrice, baseDate, onRequest = () => {}, isOwn }) {
   const [open, setOpen] = useState(true)
   const rooms = [...(unit.listing_unit_rooms || [])].sort((a, b) => a.sort_order - b.sort_order)
   const availableCount = rooms.filter(r => r.status === 'available').length
@@ -117,7 +118,6 @@ function RoomRentalUnit({ unit, basePrice, baseDate, onRequest, isOwn, user }) {
               unitName={unit.unit_name}
               onRequest={onRequest}
               isOwn={isOwn}
-              user={user}
             />
           ))}
         </div>
@@ -126,7 +126,7 @@ function RoomRentalUnit({ unit, basePrice, baseDate, onRequest, isOwn, user }) {
   )
 }
 
-export default function UnitSection({ units, basePrice, baseDate, onRequest, isOwn, user, listingId }) {
+export default function UnitSection({ units, basePrice, baseDate, onRequest = () => {}, isOwn, user, listingId }) {
   if (!units || units.length === 0) return null
 
   const sorted = [...units].sort((a, b) => {
@@ -152,9 +152,9 @@ export default function UnitSection({ units, basePrice, baseDate, onRequest, isO
           Available Units <span className="text-gray-400 font-normal text-base">({availableCount})</span>
         </h2>
         {isOwn && (
-          <a href={`/listings/${listingId}/edit`} className="text-xs text-red-700 font-medium hover:underline">
+          <Link to={`/listings/${listingId}/edit`} className="text-xs text-red-700 font-medium hover:underline">
             Edit units
-          </a>
+          </Link>
         )}
       </div>
       <div className="space-y-2">
@@ -167,7 +167,6 @@ export default function UnitSection({ units, basePrice, baseDate, onRequest, isO
               baseDate={baseDate}
               onRequest={onRequest}
               isOwn={isOwn}
-              user={user}
             />
           ) : (
             <UnitRow
@@ -177,7 +176,6 @@ export default function UnitSection({ units, basePrice, baseDate, onRequest, isO
               baseDate={baseDate}
               onRequest={onRequest}
               isOwn={isOwn}
-              user={user}
             />
           )
         ))}

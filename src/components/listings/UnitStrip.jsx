@@ -1,6 +1,7 @@
 // Computes the lowest available price across units and their rooms.
 // Falls back to the listing's base price when a unit/room has no price set.
 export function resolveLowestPrice(units, basePrice) {
+  if (!units?.length) return basePrice
   let lowest = null
   for (const unit of units) {
     if (unit.room_rental) {
@@ -22,6 +23,7 @@ export function resolveLowestPrice(units, basePrice) {
 
 // Returns count of available units (whole-unit) or units with ≥1 available room
 export function countAvailable(units) {
+  if (!units?.length) return 0
   return units.filter(u => {
     if (u.room_rental) {
       return (u.listing_unit_rooms || []).some(r => r.status === 'available')
@@ -33,10 +35,11 @@ export function countAvailable(units) {
 export default function UnitStrip({ units }) {
   if (!units || units.length === 0) return null
 
-  const available = units.filter(u => {
-    if (u.room_rental) return (u.listing_unit_rooms || []).some(r => r.status === 'available')
-    return u.status === 'available'
-  })
+  const available = units.filter(u =>
+    u.room_rental
+      ? (u.listing_unit_rooms || []).some(r => r.status === 'available')
+      : u.status === 'available'
+  )
 
   if (available.length === 0) {
     return (
