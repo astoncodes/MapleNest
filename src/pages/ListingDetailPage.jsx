@@ -88,7 +88,7 @@ function PhotoSlideshow({ images }) {
               className={`flex-shrink-0 w-16 h-12 rounded-lg overflow-hidden border-2 transition ${
                 i === active ? 'border-red-700 opacity-100' : 'border-transparent opacity-60 hover:opacity-90'
               }`}>
-              <img src={img.url} alt="" className="w-full h-full object-cover" />
+              <img src={img.url} alt="" loading="lazy" className="w-full h-full object-cover" />
             </button>
           ))}
         </div>

@@ -340,10 +340,10 @@ export default function ProfilePage() {
       </div>
 
       {/* ── Tabs ── */}
-      <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-fit">
+      <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-full sm:w-fit overflow-x-auto">
         {TABS.map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${tab === t.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+            className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition whitespace-nowrap flex-shrink-0 ${tab === t.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
             {t.label}
           </button>
         ))}
@@ -379,7 +379,7 @@ export default function ProfilePage() {
                   <Link key={l.id} to={`/listings/${l.id}`}
                     className="flex items-center gap-3 p-3 rounded-lg border border-gray-100 hover:bg-gray-50 transition">
                     <div className="w-14 h-14 rounded-lg bg-gray-100 overflow-hidden flex-shrink-0">
-                      {img ? <img src={img.url} alt="" className="w-full h-full object-cover" /> :
+                      {img ? <img src={img.url} alt="" loading="lazy" className="w-full h-full object-cover" /> :
                         <div className="w-full h-full flex items-center justify-center text-gray-300 text-xl">🏠</div>}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -465,7 +465,7 @@ export default function ProfilePage() {
                   <Link key={l.id} to={`/listings/${l.id}`}
                     className="flex items-center gap-3 p-3 rounded-lg border border-gray-100 hover:bg-gray-50 transition">
                     <div className="w-14 h-14 rounded-lg bg-gray-100 overflow-hidden flex-shrink-0">
-                      {img ? <img src={img.url} alt={l.title} className="w-full h-full object-cover" /> :
+                      {img ? <img src={img.url} alt={l.title} loading="lazy" className="w-full h-full object-cover" /> :
                         <div className="w-full h-full flex items-center justify-center text-gray-300 text-xl">🏠</div>}
                     </div>
                     <div className="flex-1 min-w-0">

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 
 const TYPE_LABELS = {
@@ -76,55 +76,55 @@ export default function AnalyticsPage() {
     </div>
   )
 
-  // Compute summary stats
-  const prices = listings.map(l => l.price).filter(Boolean)
-  const avgPrice = prices.length ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length) : 0
-  const minPrice = prices.length ? Math.min(...prices) : 0
-  const maxPrice = prices.length ? Math.max(...prices) : 0
+  // Compute summary stats (memoized to avoid recalculation on re-render)
+  const { prices, avgPrice, minPrice, maxPrice, byCity, byType, avgByCity, priceDistribution } = useMemo(() => {
+    const prices = listings.map(l => l.price).filter(Boolean)
+    const avgPrice = prices.length ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length) : 0
+    const minPrice = prices.length ? Math.min(...prices) : 0
+    const maxPrice = prices.length ? Math.max(...prices) : 0
 
-  // By city
-  const cityMap = {}
-  listings.forEach(l => { cityMap[l.city] = (cityMap[l.city] || 0) + 1 })
-  const byCity = Object.entries(cityMap)
-    .map(([label, count]) => ({ label, count }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 6)
+    const cityMap = {}
+    listings.forEach(l => { cityMap[l.city] = (cityMap[l.city] || 0) + 1 })
+    const byCity = Object.entries(cityMap)
+      .map(([label, count]) => ({ label, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 6)
 
-  // By type
-  const typeMap = {}
-  listings.forEach(l => { typeMap[l.property_type] = (typeMap[l.property_type] || 0) + 1 })
-  const byType = Object.entries(typeMap)
-    .map(([key, count]) => ({ label: TYPE_LABELS[key] || key, count }))
-    .sort((a, b) => b.count - a.count)
+    const typeMap = {}
+    listings.forEach(l => { typeMap[l.property_type] = (typeMap[l.property_type] || 0) + 1 })
+    const byType = Object.entries(typeMap)
+      .map(([key, count]) => ({ label: TYPE_LABELS[key] || key, count }))
+      .sort((a, b) => b.count - a.count)
 
-  // Avg price by city
-  const cityPriceMap = {}
-  listings.forEach(l => {
-    if (!l.price || !l.city) return
-    if (!cityPriceMap[l.city]) cityPriceMap[l.city] = []
-    cityPriceMap[l.city].push(l.price)
-  })
-  const avgByCity = Object.entries(cityPriceMap)
-    .map(([label, arr]) => {
-      const avg = Math.round(arr.reduce((a, b) => a + b, 0) / arr.length)
-      return { label, count: avg, display: fmt(avg) }
+    const cityPriceMap = {}
+    listings.forEach(l => {
+      if (!l.price || !l.city) return
+      if (!cityPriceMap[l.city]) cityPriceMap[l.city] = []
+      cityPriceMap[l.city].push(l.price)
     })
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 6)
+    const avgByCity = Object.entries(cityPriceMap)
+      .map(([label, arr]) => {
+        const avg = Math.round(arr.reduce((a, b) => a + b, 0) / arr.length)
+        return { label, count: avg, display: fmt(avg) }
+      })
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 6)
 
-  // Price buckets
-  const buckets = [
-    { label: '<$800', min: 0, max: 800 },
-    { label: '$800–1k', min: 800, max: 1000 },
-    { label: '$1k–1.2k', min: 1000, max: 1200 },
-    { label: '$1.2k–1.5k', min: 1200, max: 1500 },
-    { label: '$1.5k–2k', min: 1500, max: 2000 },
-    { label: '>$2k', min: 2000, max: Infinity },
-  ]
-  const priceDistribution = buckets.map(b => ({
-    label: b.label,
-    count: prices.filter(p => p >= b.min && p < b.max).length,
-  }))
+    const buckets = [
+      { label: '<$800', min: 0, max: 800 },
+      { label: '$800\u20131k', min: 800, max: 1000 },
+      { label: '$1k\u20131.2k', min: 1000, max: 1200 },
+      { label: '$1.2k\u20131.5k', min: 1200, max: 1500 },
+      { label: '$1.5k\u20132k', min: 1500, max: 2000 },
+      { label: '>$2k', min: 2000, max: Infinity },
+    ]
+    const priceDistribution = buckets.map(b => ({
+      label: b.label,
+      count: prices.filter(p => p >= b.min && p < b.max).length,
+    }))
+
+    return { prices, avgPrice, minPrice, maxPrice, byCity, byType, avgByCity, priceDistribution }
+  }, [listings])
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">

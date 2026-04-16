@@ -386,20 +386,20 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
       </div>
 
       {/* Step indicator */}
-      <div className="flex items-center gap-2 mb-8">
+      <div className="flex items-center gap-1 sm:gap-2 mb-8">
         {[1, 2, 3, ...(isRenter ? [] : [4])].map((s, idx, arr) => (
-          <div key={s} className="flex items-center gap-2">
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-colors ${
+          <div key={s} className="flex items-center gap-1 sm:gap-2">
+            <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm font-semibold transition-colors ${
               s < step ? 'bg-green-500 text-white' :
               s === step ? 'bg-red-700 text-white' :
               'bg-gray-100 text-gray-400'
             }`}>
               {s < step ? '✓' : s}
             </div>
-            <span className={`text-sm ${s === step ? 'text-gray-800 font-medium' : 'text-gray-400'}`}>
+            <span className={`hidden sm:inline text-sm ${s === step ? 'text-gray-800 font-medium' : 'text-gray-400'}`}>
               {s === 1 ? 'Property' : s === 2 ? 'Details' : s === 3 ? 'Photos' : 'Units'}
             </span>
-            {idx < arr.length - 1 && <div className={`w-8 h-px ${s < step ? 'bg-green-400' : 'bg-gray-200'}`} />}
+            {idx < arr.length - 1 && <div className={`w-5 sm:w-8 h-px ${s < step ? 'bg-green-400' : 'bg-gray-200'}`} />}
           </div>
         ))}
       </div>
@@ -588,7 +588,7 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
                   {existingImages.map((img, i) => (
                     <div key={img.id} className="relative group">
                       <div className="aspect-square rounded-lg overflow-hidden bg-gray-100">
-                        <img src={img.url} alt={`Existing ${i + 1}`} className="w-full h-full object-cover" />
+                        <img src={img.url} alt={`Existing ${i + 1}`} loading="lazy" className="w-full h-full object-cover" />
                       </div>
                       {img.is_primary && (
                         <div className="absolute top-1 left-1 bg-red-700 text-white text-xs px-1.5 py-0.5 rounded font-medium">
@@ -638,7 +638,7 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
                 {photoPreviewUrls.map((url, i) => (
                   <div key={i} className="relative group">
                     <div className="aspect-square rounded-lg overflow-hidden bg-gray-100">
-                      <img src={url} alt={`Photo ${i + 1}`} className="w-full h-full object-cover" />
+                      <img src={url} alt={`Photo ${i + 1}`} loading="lazy" className="w-full h-full object-cover" />
                     </div>
 
                     {/* Primary badge */}

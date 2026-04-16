@@ -34,7 +34,7 @@ function ListingCard({ listing, isSaved, onToggleSave }) {
       {/* Image */}
       <div className="aspect-video bg-gray-100 overflow-hidden relative">
         {image ? (
-          <img src={image} alt={listing.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+          <img src={image} alt={listing.title} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-gray-300 text-4xl">🏠</div>
         )}

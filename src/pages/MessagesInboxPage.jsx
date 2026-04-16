@@ -119,7 +119,7 @@ export default function MessagesInboxPage() {
                 </div>
                 {listingImage && (
                   <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100">
-                    <img src={listingImage.url} alt="" className="w-full h-full object-cover" />
+                    <img src={listingImage.url} alt="" loading="lazy" className="w-full h-full object-cover" />
                   </div>
                 )}
                 {unread > 0 && (
