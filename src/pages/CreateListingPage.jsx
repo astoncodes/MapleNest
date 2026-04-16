@@ -50,6 +50,7 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
   const [unitModalOpen, setUnitModalOpen] = useState(false)
   const [editingUnit, setEditingUnit] = useState(null)
   const [bulkModalOpen, setBulkModalOpen] = useState(false)
+  const [tenancies, setTenancies] = useState([])
 
   const [photos, setPhotos] = useState([])           // File objects
   const [photoPreviewUrls, setPhotoPreviewUrls] = useState([])
@@ -118,7 +119,18 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
           .select('*, listing_unit_rooms(*)')
           .eq('listing_id', listing.id)
           .order('sort_order')
-          .then(({ data, error }) => { if (!error) setUnits(data || []) })
+          .then(({ data, error }) => {
+            if (!error) setUnits(data || [])
+            // Fetch active tenancies for these units (landlord only)
+            if (!error && data?.length) {
+              supabase
+                .from('tenancies')
+                .select('id, unit_id, room_id, renter:renter_id(full_name)')
+                .eq('listing_id', listing.id)
+                .eq('status', 'active')
+                .then(({ data: tenancyData }) => { setTenancies(tenancyData || []) })
+            }
+          })
       }
     }
   }, [mode, listing])
@@ -720,6 +732,13 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
                         {unit.floor != null && <span className="text-gray-400">· Floor {unit.floor}</span>}
                         {unit.price && <span className="text-gray-400">· ${unit.price}/mo</span>}
                         {isFull && <span className="text-xs bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded-full">{statusLabel}</span>}
+                        {(() => {
+                          const t = tenancies.find(t => t.unit_id === unit.id)
+                          if (t?.renter?.full_name) {
+                            return <span className="text-xs text-gray-400">· {t.renter.full_name}</span>
+                          }
+                          return null
+                        })()}
                         <button
                           type="button"
                           onClick={() => { setEditingUnit(unit); setUnitModalOpen(true) }}
