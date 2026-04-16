@@ -615,6 +615,7 @@ DECLARE
 BEGIN
   SELECT * INTO v_tenancy FROM tenancies WHERE id = p_tenancy_id;
   IF NOT FOUND THEN RETURN; END IF;
+  IF v_tenancy.renter_id != auth.uid() AND v_tenancy.landlord_id != auth.uid() THEN RETURN; END IF;
 
   SELECT count(*) INTO v_review_count
   FROM reviews WHERE tenancy_id = p_tenancy_id;
@@ -663,7 +664,7 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.expire_pending_reviews(uuid) TO authenticated, anon;
+GRANT EXECUTE ON FUNCTION public.expire_pending_reviews(uuid) TO authenticated;
 
 -- ── tenancy delete trigger ───────────────────────────────────────────────────
 
@@ -681,6 +682,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
+DROP TRIGGER IF EXISTS tenancy_before_delete ON public.tenancies;
 CREATE TRIGGER tenancy_before_delete
   BEFORE DELETE ON public.tenancies
   FOR EACH ROW

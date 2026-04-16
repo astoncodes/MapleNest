@@ -94,9 +94,10 @@ DECLARE
   v_tenancy record;
   v_reviewee_ids uuid[];
 BEGIN
-  -- Get tenancy info
+  -- Get tenancy info; only allow participants to trigger reveal
   SELECT * INTO v_tenancy FROM tenancies WHERE id = p_tenancy_id;
   IF NOT FOUND THEN RETURN; END IF;
+  IF v_tenancy.renter_id != auth.uid() AND v_tenancy.landlord_id != auth.uid() THEN RETURN; END IF;
 
   -- Count reviews for this tenancy
   SELECT count(*) INTO v_review_count
@@ -156,7 +157,7 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.expire_pending_reviews(uuid) TO authenticated, anon;
+GRANT EXECUTE ON FUNCTION public.expire_pending_reviews(uuid) TO authenticated;
 
 -- =============================================
 -- TENANCY DELETE TRIGGER (cascading cleanup)
@@ -177,6 +178,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
+DROP TRIGGER IF EXISTS tenancy_before_delete ON public.tenancies;
 CREATE TRIGGER tenancy_before_delete
   BEFORE DELETE ON public.tenancies
   FOR EACH ROW
