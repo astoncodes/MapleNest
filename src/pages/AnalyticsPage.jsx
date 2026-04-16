@@ -59,25 +59,7 @@ export default function AnalyticsPage() {
     return () => { cancelled = true }
   }, [])
 
-  if (loading) return (
-    <div className="max-w-5xl mx-auto px-4 py-10 animate-pulse space-y-4">
-      <div className="h-8 bg-gray-200 rounded w-48" />
-      <div className="grid grid-cols-4 gap-4">
-        {[...Array(4)].map((_, i) => <div key={i} className="h-24 bg-gray-200 rounded-xl" />)}
-      </div>
-      <div className="h-56 bg-gray-200 rounded-xl" />
-    </div>
-  )
-
-  if (error) return (
-    <div className="max-w-5xl mx-auto px-4 py-16 text-center">
-      <p className="text-red-600 font-medium">Failed to load analytics data.</p>
-      <p className="text-sm text-gray-400 mt-1">{error}</p>
-    </div>
-  )
-
-  // Compute summary stats (memoized to avoid recalculation on re-render)
-  const { prices, avgPrice, minPrice, maxPrice, byCity, byType, avgByCity, priceDistribution } = useMemo(() => {
+  const { avgPrice, minPrice, maxPrice, byCity, byType, avgByCity, priceDistribution } = useMemo(() => {
     const prices = listings.map(l => l.price).filter(Boolean)
     const avgPrice = prices.length ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length) : 0
     const minPrice = prices.length ? Math.min(...prices) : 0
@@ -123,8 +105,25 @@ export default function AnalyticsPage() {
       count: prices.filter(p => p >= b.min && p < b.max).length,
     }))
 
-    return { prices, avgPrice, minPrice, maxPrice, byCity, byType, avgByCity, priceDistribution }
+    return { avgPrice, minPrice, maxPrice, byCity, byType, avgByCity, priceDistribution }
   }, [listings])
+
+  if (loading) return (
+    <div className="max-w-5xl mx-auto px-4 py-10 animate-pulse space-y-4">
+      <div className="h-8 bg-gray-200 rounded w-48" />
+      <div className="grid grid-cols-4 gap-4">
+        {[...Array(4)].map((_, i) => <div key={i} className="h-24 bg-gray-200 rounded-xl" />)}
+      </div>
+      <div className="h-56 bg-gray-200 rounded-xl" />
+    </div>
+  )
+
+  if (error) return (
+    <div className="max-w-5xl mx-auto px-4 py-16 text-center">
+      <p className="text-red-600 font-medium">Failed to load analytics data.</p>
+      <p className="text-sm text-gray-400 mt-1">{error}</p>
+    </div>
+  )
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
