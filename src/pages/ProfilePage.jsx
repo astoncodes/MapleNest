@@ -16,24 +16,6 @@ function StarRating({ rating, max = 5, size = 'sm' }) {
   )
 }
 
-// ── Interactive star picker ──────────────────────────────────────────────────
-function StarPicker({ value, onChange }) {
-  const [hover, setHover] = useState(0)
-  return (
-    <span className="inline-flex gap-1">
-      {[1, 2, 3, 4, 5].map(n => (
-        <button key={n} type="button"
-          onMouseEnter={() => setHover(n)}
-          onMouseLeave={() => setHover(0)}
-          onClick={() => onChange(n)}
-          className="text-2xl transition-transform hover:scale-110 focus:outline-none">
-          <span className={(hover || value) >= n ? 'text-amber-400' : 'text-gray-200'}>★</span>
-        </button>
-      ))}
-    </span>
-  )
-}
-
 // ── Avatar ───────────────────────────────────────────────────────────────────
 function Avatar({ profile, size = 'md' }) {
   const sizes = { sm: 'w-10 h-10 text-base', md: 'w-16 h-16 text-2xl', lg: 'w-24 h-24 text-4xl' }
@@ -104,22 +86,18 @@ export default function ProfilePage() {
   const [avatarUploading, setAvatarUploading] = useState(false)
   const [avatarError, setAvatarError] = useState(null)
 
-  // Leave review state
-  const [reviewForm, setReviewForm] = useState({ rating: 0, comment: '' })
-  const [reviewLoading, setReviewLoading] = useState(false)
-  const [reviewError, setReviewError] = useState(null)
-  const [reviewSuccess, setReviewSuccess] = useState(false)
-  const [hasReviewed, setHasReviewed] = useState(false)
-
   const fetchAll = useCallback(async () => {
     setLoading(true)
     try {
+      // Lazy-expire any reviews past their window for this profile
+      await supabase.rpc('expire_pending_reviews', { p_profile_id: viewingId })
+
       const [{ data: prof }, { data: listData }, { data: revData }, { data: savedData }] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', viewingId).single(),
         supabase.from('listings').select('id, title, city, property_type, status, price, created_at, listing_images(url, is_primary)')
           .eq('landlord_id', viewingId).eq('status', 'active').order('created_at', { ascending: false }),
-        supabase.from('reviews').select('*, reviewer:reviewer_id(full_name, avatar_url, email)')
-          .eq('reviewee_id', viewingId).order('created_at', { ascending: false }),
+        supabase.from('reviews').select('*, reviewer:reviewer_id(full_name, avatar_url, email), tenancy:tenancy_id(listing:listing_id(title), unit:unit_id(unit_name))')
+          .eq('reviewee_id', viewingId).eq('visible', true).order('created_at', { ascending: false }),
         isOwn
           ? supabase.from('saved_listings').select('listing_id, listings(id, title, city, property_type, price, created_at, listing_images(url, is_primary))').eq('user_id', viewingId).order('created_at', { ascending: false })
           : Promise.resolve({ data: [] }),
@@ -128,13 +106,10 @@ export default function ProfilePage() {
       setListings(listData || [])
       setReviews(revData || [])
       setSavedListings((savedData || []).map(r => r.listings).filter(Boolean))
-      if (user && revData) {
-        setHasReviewed(revData.some(r => r.reviewer_id === user.id))
-      }
     } finally {
       setLoading(false)
     }
-  }, [isOwn, user, viewingId])
+  }, [isOwn, viewingId])
 
   useEffect(() => {
     if (!viewingId) return
@@ -198,28 +173,6 @@ export default function ProfilePage() {
     }
   }
 
-  // ── Submit review ────────────────────────────────────────────────────────
-  const handleSubmitReview = async (e) => {
-    e.preventDefault()
-    if (!reviewForm.rating) { setReviewError('Please select a star rating.'); return }
-    if (user?.id === viewingId) { setReviewError('You cannot review yourself.'); return }
-    setReviewLoading(true); setReviewError(null)
-    const { error } = await supabase.from('reviews').insert({
-      reviewer_id: user.id,
-      reviewee_id: viewingId,
-      rating: reviewForm.rating,
-      comment: reviewForm.comment,
-    })
-    setReviewLoading(false)
-    if (error) {
-      setReviewError(error.code === '23505' ? 'You have already reviewed this profile.' : error.message)
-    } else {
-      setReviewSuccess(true); setHasReviewed(true)
-      setReviewForm({ rating: 0, comment: '' })
-      fetchAll()
-    }
-  }
-
   if (loading) return (
     <div className="max-w-4xl mx-auto px-4 py-12">
       <div className="animate-pulse space-y-4">
@@ -237,6 +190,18 @@ export default function ProfilePage() {
 
   const avgRating = reviews.length ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length) : 0
   const isLandlord = profile.role === 'landlord'
+
+  // Compute top tags from visible reviews
+  const tagCounts = {}
+  reviews.forEach(r => {
+    (r.tags || []).forEach(tag => {
+      tagCounts[tag] = (tagCounts[tag] || 0) + 1
+    })
+  })
+  const topTags = Object.entries(tagCounts)
+    .filter(([, count]) => count >= 2)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
 
   const TABS = [
     { key: 'overview', label: 'Overview' },
@@ -331,6 +296,15 @@ export default function ProfilePage() {
                   <span className="text-sm text-gray-400">({reviews.length} review{reviews.length !== 1 ? 's' : ''})</span>
                 </div>
               )}
+              {topTags.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                  {topTags.map(([tag, count]) => (
+                    <span key={tag} className="inline-flex items-center gap-1 bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-full">
+                      {tag} <span className="text-gray-400">({count})</span>
+                    </span>
+                  ))}
+                </div>
+              )}
             </>
           )}
 
@@ -413,6 +387,19 @@ export default function ProfilePage() {
                       <StarRating rating={r.rating} />
                       <span className="text-xs text-gray-400 ml-auto">{new Date(r.created_at).toLocaleDateString('en-CA')}</span>
                     </div>
+                    {r.tenancy?.listing?.title && (
+                      <p className="text-xs text-gray-400 ml-9 mb-1">
+                        {r.tenancy.listing.title}
+                        {r.tenancy.unit?.unit_name ? ` · ${r.tenancy.unit.unit_name}` : ''}
+                      </p>
+                    )}
+                    {r.tags?.length > 0 && (
+                      <div className="flex flex-wrap gap-1 ml-9 mb-1">
+                        {r.tags.map(tag => (
+                          <span key={tag} className="bg-gray-100 text-gray-500 text-xs px-2 py-0.5 rounded-full">{tag}</span>
+                        ))}
+                      </div>
+                    )}
                     {r.comment && <p className="text-sm text-gray-600 ml-9">{r.comment}</p>}
                   </div>
                 ))}
@@ -420,33 +407,6 @@ export default function ProfilePage() {
             )}
           </Section>
 
-          {/* Leave a review (only if not own profile and logged in) */}
-          {!isOwn && user && !hasReviewed && (
-            <Section title="Leave a Review">
-              {reviewSuccess ? (
-                <p className="text-sm text-green-600 text-center py-4">✓ Thanks for your review!</p>
-              ) : (
-                <form onSubmit={handleSubmitReview} className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-2">Rating</label>
-                    <StarPicker value={reviewForm.rating} onChange={v => setReviewForm(p => ({ ...p, rating: v }))} />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Comment (optional)</label>
-                    <textarea rows={3} value={reviewForm.comment}
-                      onChange={e => setReviewForm(p => ({ ...p, comment: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
-                      placeholder="Share your experience with this person..." />
-                  </div>
-                  {reviewError && <p className="text-xs text-red-600">{reviewError}</p>}
-                  <button type="submit" disabled={reviewLoading || !reviewForm.rating}
-                    className="px-5 py-2 bg-red-700 text-white text-sm font-medium rounded-lg hover:bg-red-800 transition disabled:opacity-50">
-                    {reviewLoading ? 'Submitting...' : 'Submit Review'}
-                  </button>
-                </form>
-              )}
-            </Section>
-          )}
         </div>
       )}
 
