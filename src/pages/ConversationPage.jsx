@@ -2,6 +2,9 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Link, useParams, useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
+import TenancyBar from '../components/tenancy/TenancyBar'
+import AssignTenantModal from '../components/tenancy/AssignTenantModal'
+import ReviewPromptBanner from '../components/reviews/ReviewPromptBanner'
 
 function Avatar({ profile }) {
   if (profile?.avatar_url) {
@@ -40,6 +43,9 @@ export default function ConversationPage() {
   const bottomRef = useRef(null)
   const inputRef = useRef(null)
   const lastMessageAtRef = useRef(null)
+  const [tenancy, setTenancy] = useState(null)
+  const [showAssignModal, setShowAssignModal] = useState(false)
+  const [hasSubmittedReview, setHasSubmittedReview] = useState(false)
 
   // Keep ref in sync with conversation state for use inside real-time callbacks
   useEffect(() => {
@@ -118,6 +124,32 @@ export default function ConversationPage() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  // Fetch tenancy for this conversation (landlord sees management, both see review prompts)
+  useEffect(() => {
+    if (!conversation?.id || isNew) return
+    const fetchTenancy = async () => {
+      const { data } = await supabase
+        .from('tenancies')
+        .select('id, listing_id, unit_id, room_id, renter_id, landlord_id, conversation_id, move_in, move_out, status, review_window_closes_at, unit:unit_id(unit_name), room:room_id(room_name)')
+        .eq('conversation_id', conversation.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (data) {
+        setTenancy(data)
+        const { data: existingReview } = await supabase
+          .from('reviews')
+          .select('id')
+          .eq('tenancy_id', data.id)
+          .eq('reviewer_id', user.id)
+          .maybeSingle()
+        setHasSubmittedReview(!!existingReview)
+      }
+    }
+    fetchTenancy()
+  }, [conversation?.id, isNew, user])
 
   // Real-time subscription for new messages from the other party
   useEffect(() => {
@@ -326,6 +358,29 @@ export default function ConversationPage() {
         </div>
       </div>
 
+      {/* Tenancy bar — landlord only */}
+      {user.id === conversation?.landlord_id && conversation?.listing?.id && (
+        <TenancyBar
+          tenancy={tenancy?.status === 'active' ? tenancy : null}
+          onEnded={(updated) => setTenancy(updated)}
+          onAssignClick={() => setShowAssignModal(true)}
+        />
+      )}
+
+      {/* Review prompt — both parties, after tenancy ends */}
+      {tenancy?.status === 'ended' && (
+        <div className="px-4 py-2 flex-shrink-0">
+          <ReviewPromptBanner
+            tenancy={tenancy}
+            currentUserId={user.id}
+            hasSubmittedReview={hasSubmittedReview}
+            reviewWindowClosesAt={tenancy.review_window_closes_at}
+            listingTitle={conversation?.listing?.title}
+            onReviewSubmitted={() => setHasSubmittedReview(true)}
+          />
+        </div>
+      )}
+
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
         {messages.length === 0 && (
@@ -378,6 +433,19 @@ export default function ConversationPage() {
           </button>
         </form>
       </div>
+
+      {showAssignModal && conversation?.listing?.id && (
+        <AssignTenantModal
+          listingId={conversation.listing.id}
+          renterId={conversation.renter_id}
+          conversationId={conversation.id}
+          onAssigned={(t) => {
+            setTenancy({ ...t, unit: { unit_name: '' }, room: null })
+            setShowAssignModal(false)
+          }}
+          onClose={() => setShowAssignModal(false)}
+        />
+      )}
     </div>
   )
 }
