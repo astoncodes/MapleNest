@@ -76,10 +76,10 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     setLoading(true)
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      refreshUser(session?.user)
-    })
-
+    // onAuthStateChange fires once with INITIAL_SESSION on subscribe, so
+    // we don't also need supabase.auth.getSession() — the double bootstrap
+    // caused refreshUser to run twice on mount and could insert a duplicate
+    // profile when the !profile race-fallback branch fired on both calls.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       refreshUser(session?.user)
     })
