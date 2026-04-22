@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
@@ -9,17 +9,30 @@ export default function ResetPasswordPage() {
   const [error, setError] = useState(null)
   const [done, setDone] = useState(false)
   const [validSession, setValidSession] = useState(false)
+  const [linkExpired, setLinkExpired] = useState(false)
+  const validSessionRef = useRef(false)
   const navigate = useNavigate()
 
   useEffect(() => {
     // Supabase puts the access token in the URL hash when user clicks the email link
-    // onAuthStateChange fires with SIGNED_IN event when the token is valid
+    // onAuthStateChange fires with PASSWORD_RECOVERY event when the token is valid.
+    // If we don't see that event within 5s, treat the link as expired/invalid
+    // instead of leaving the user on the "Verifying..." screen forever.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY') {
+        validSessionRef.current = true
         setValidSession(true)
       }
     })
-    return () => subscription.unsubscribe()
+
+    const timeout = setTimeout(() => {
+      if (!validSessionRef.current) setLinkExpired(true)
+    }, 5000)
+
+    return () => {
+      subscription.unsubscribe()
+      clearTimeout(timeout)
+    }
   }, [])
 
   const handleSubmit = async (e) => {
@@ -65,6 +78,23 @@ export default function ResetPasswordPage() {
   }
 
   if (!validSession) {
+    if (linkExpired) {
+      return (
+        <div className="min-h-screen flex items-center justify-center px-4">
+          <div className="text-center max-w-sm">
+            <div className="text-5xl mb-4">⚠️</div>
+            <h2 className="text-xl font-bold text-gray-800 mb-2">Reset link expired or invalid</h2>
+            <p className="text-gray-500 text-sm mb-4">
+              We couldn&apos;t verify your reset link. It may have expired or already been used.
+            </p>
+            <Link to="/forgot-password" className="text-red-700 text-sm font-medium hover:underline">
+              Request a new reset link
+            </Link>
+          </div>
+        </div>
+      )
+    }
+
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
         <div className="text-center max-w-sm">
