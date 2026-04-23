@@ -46,6 +46,7 @@ export default function ConversationPage() {
   const [tenancy, setTenancy] = useState(null)
   const [showAssignModal, setShowAssignModal] = useState(false)
   const [hasSubmittedReview, setHasSubmittedReview] = useState(false)
+  const [realtimeHealthy, setRealtimeHealthy] = useState(true)
   const userId = user?.id
 
   // Capture router state into a ref — location.state is a new object reference
@@ -194,13 +195,23 @@ export default function ConversationPage() {
           }
         }
       )
-      .subscribe()
+      .subscribe((status) => {
+        // Supabase emits CHANNEL_ERROR / TIMED_OUT when the socket can't
+        // keep up (replication disabled, network partition). Flip to
+        // polling fallback in those cases; keep polling off otherwise (B26).
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          setRealtimeHealthy(false)
+        } else if (status === 'SUBSCRIBED') {
+          setRealtimeHealthy(true)
+        }
+      })
     return () => { supabase.removeChannel(channel) }
   }, [id, isNew, userId])
 
-  // Polling fallback — catches messages real-time misses (e.g. replication not enabled)
+  // Polling fallback — only runs when realtime reports an unhealthy channel (B26).
+  // Prevents doubling up network traffic when realtime is working fine.
   useEffect(() => {
-    if (!id || isNew || !userId) return
+    if (!id || isNew || !userId || realtimeHealthy) return
     const poll = setInterval(async () => {
       const since = lastMessageAtRef.current
       if (!since) return
@@ -225,7 +236,7 @@ export default function ConversationPage() {
       })
     }, 5000)
     return () => clearInterval(poll)
-  }, [id, isNew, userId])
+  }, [id, isNew, userId, realtimeHealthy])
 
   const handleSend = async (e) => {
     e.preventDefault()
