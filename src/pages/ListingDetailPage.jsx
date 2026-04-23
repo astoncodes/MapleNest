@@ -179,12 +179,12 @@ export default function ListingDetailPage() {
 
     if (error || !data) { navigate('/listings'); return }
 
-    // Sort images: primary first, then by sort_order
+    // Sort images: primary first, then by sort_order (treat null as 0 to keep ordering deterministic)
     if (data.listing_images?.length > 0) {
       data.listing_images.sort((a, b) => {
         if (a.is_primary && !b.is_primary) return -1
         if (!a.is_primary && b.is_primary) return 1
-        return a.sort_order - b.sort_order
+        return (a.sort_order ?? 0) - (b.sort_order ?? 0)
       })
     }
 
