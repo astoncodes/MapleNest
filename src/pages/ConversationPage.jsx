@@ -46,6 +46,13 @@ export default function ConversationPage() {
   const [tenancy, setTenancy] = useState(null)
   const [showAssignModal, setShowAssignModal] = useState(false)
   const [hasSubmittedReview, setHasSubmittedReview] = useState(false)
+  const userId = user?.id
+
+  // Capture router state into a ref — location.state is a new object reference
+  // every render, so including it directly in effect deps causes refetch storms
+  // on every re-render (B18).
+  const newConvoStateRef = useRef(newConvoState)
+  useEffect(() => { newConvoStateRef.current = newConvoState }, [newConvoState])
 
   // Keep ref in sync with conversation state for use inside real-time callbacks
   useEffect(() => {
@@ -53,6 +60,7 @@ export default function ConversationPage() {
   }, [conversation])
 
   const fetchConversation = useCallback(async () => {
+    if (!userId) return
     setLoading(true)
     const { data: convo, error: convoErr } = await supabase
       .from('conversations')
@@ -68,7 +76,7 @@ export default function ConversationPage() {
       .single()
 
     if (convoErr || !convo) { navigate('/messages'); return }
-    if (convo.renter_id !== user.id && convo.landlord_id !== user.id) {
+    if (convo.renter_id !== userId && convo.landlord_id !== userId) {
       navigate('/messages'); return
     }
 
@@ -89,36 +97,38 @@ export default function ConversationPage() {
       .from('messages')
       .update({ read: true })
       .eq('conversation_id', id)
-      .neq('sender_id', user.id)
+      .neq('sender_id', userId)
       .eq('read', false)
 
-    const unreadField = user.id === convo.renter_id ? 'renter_unread' : 'landlord_unread'
+    const unreadField = userId === convo.renter_id ? 'renter_unread' : 'landlord_unread'
     await supabase.from('conversations').update({ [unreadField]: 0 }).eq('id', id)
-  }, [id, navigate, user])
+  }, [id, navigate, userId])
 
   // Initialize: either fetch existing conversation or set up from router state
   useEffect(() => {
     if (isNew) {
-      if (!newConvoState?.listingId) { navigate('/messages'); return }
+      const state = newConvoStateRef.current
+      if (!state?.listingId) { navigate('/messages'); return }
       setConversation({
         id: null,
-        renter_id: user.id,
-        landlord_id: newConvoState.landlordId,
-        listing: newConvoState.listing,
-        landlord: newConvoState.landlord,
+        renter_id: userId,
+        landlord_id: state.landlordId,
+        listing: state.listing,
+        landlord: state.landlord,
         renter: user?.profile,
       })
-      if (newConvoState.unitName) {
-        const roomPart = newConvoState.roomName
-          ? ` (${newConvoState.roomName})`
+      if (state.unitName) {
+        const roomPart = state.roomName
+          ? ` (${state.roomName})`
           : ''
-        setNewMessage(`Hi, I'm interested in ${newConvoState.unitName}${roomPart} — is it still available?`)
+        setNewMessage(`Hi, I'm interested in ${state.unitName}${roomPart} — is it still available?`)
       }
       setLoading(false)
       return
     }
-    if (user) fetchConversation()
-  }, [fetchConversation, id, isNew, navigate, newConvoState, user])
+    if (userId) fetchConversation()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchConversation, id, isNew, navigate, userId])
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -127,7 +137,7 @@ export default function ConversationPage() {
 
   // Fetch tenancy for this conversation (landlord sees management, both see review prompts)
   useEffect(() => {
-    if (!conversation?.id || isNew) return
+    if (!conversation?.id || isNew || !userId) return
     const fetchTenancy = async () => {
       const { data } = await supabase
         .from('tenancies')
@@ -143,24 +153,26 @@ export default function ConversationPage() {
           .from('reviews')
           .select('id')
           .eq('tenancy_id', data.id)
-          .eq('reviewer_id', user.id)
+          .eq('reviewer_id', userId)
           .maybeSingle()
         setHasSubmittedReview(!!existingReview)
       }
     }
     fetchTenancy()
-  }, [conversation?.id, isNew, user])
+  }, [conversation?.id, isNew, userId])
 
-  // Real-time subscription for new messages from the other party
+  // Real-time subscription for new messages from the other party.
+  // Depend on userId (primitive) not user (object) so the subscription
+  // doesn't tear down and recreate on every token refresh (B33).
   useEffect(() => {
-    if (!id || isNew || !user) return
+    if (!id || isNew || !userId) return
     const channel = supabase
       .channel(`messages-${id}`)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${id}` },
         async (payload) => {
-          if (payload.new.sender_id === user.id) return
+          if (payload.new.sender_id === userId) return
           const { data: msg } = await supabase
             .from('messages')
             .select('id, content, created_at, read, sender_id, sender:sender_id(id, full_name, avatar_url, email)')
@@ -175,7 +187,7 @@ export default function ConversationPage() {
             supabase.from('messages').update({ read: true }).eq('id', msg.id)
             const convo = conversationRef.current
             if (convo) {
-              const myUnreadField = user.id === convo.renter_id ? 'renter_unread' : 'landlord_unread'
+              const myUnreadField = userId === convo.renter_id ? 'renter_unread' : 'landlord_unread'
               supabase.from('conversations').update({ [myUnreadField]: 0 }).eq('id', convo.id)
               setConversation(prev => prev ? { ...prev, [myUnreadField]: 0 } : prev)
             }
@@ -184,11 +196,11 @@ export default function ConversationPage() {
       )
       .subscribe()
     return () => { supabase.removeChannel(channel) }
-  }, [id, isNew, user])
+  }, [id, isNew, userId])
 
   // Polling fallback — catches messages real-time misses (e.g. replication not enabled)
   useEffect(() => {
-    if (!id || isNew || !user) return
+    if (!id || isNew || !userId) return
     const poll = setInterval(async () => {
       const since = lastMessageAtRef.current
       if (!since) return
@@ -205,7 +217,7 @@ export default function ConversationPage() {
         if (!incoming.length) return prev
         lastMessageAtRef.current = data[data.length - 1].created_at
         // Mark other party's new messages as read
-        const others = incoming.filter(m => m.sender_id !== user.id)
+        const others = incoming.filter(m => m.sender_id !== userId)
         if (others.length) {
           supabase.from('messages').update({ read: true }).in('id', others.map(m => m.id))
         }
@@ -213,7 +225,7 @@ export default function ConversationPage() {
       })
     }, 5000)
     return () => clearInterval(poll)
-  }, [id, isNew, user])
+  }, [id, isNew, userId])
 
   const handleSend = async (e) => {
     e.preventDefault()
