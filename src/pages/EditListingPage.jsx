@@ -5,18 +5,27 @@ import { supabase } from '../lib/supabase'
 import { canModifyListing } from '../utils/listingPermissions'
 import { useAuth } from '../hooks/useAuth'
 
+// 'loading' stays until both auth and the listing fetch resolve, so we
+// never render CreateListingPage against a stale/missing user.
 export default function EditListingPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { user, loading: authLoading } = useAuth()
+  const [status, setStatus] = useState('loading') // 'loading' | 'ready' | 'not_found' | 'unauthorized'
   const [listing, setListing] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
 
   useEffect(() => {
-    let isActive = true
+    if (authLoading) return
 
-    const fetchListing = async () => {
+    let isActive = true
+    setStatus('loading')
+
+    const run = async () => {
+      if (!user) {
+        if (isActive) setStatus('unauthorized')
+        return
+      }
+
       const { data, error } = await supabase
         .from('listings')
         .select('*, listing_images(id, url, is_primary, sort_order, storage_path)')
@@ -26,40 +35,35 @@ export default function EditListingPage() {
       if (!isActive) return
 
       if (error || !data) {
-        setError('Listing not found or you do not have access to edit it.')
-        setListing(null)
-        setLoading(false)
+        setStatus('not_found')
+        return
+      }
+
+      if (!canModifyListing(user, data)) {
+        setStatus('unauthorized')
         return
       }
 
       setListing(data)
-      setLoading(false)
+      setStatus('ready')
     }
 
-    fetchListing()
+    run()
 
-    return () => {
-      isActive = false
-    }
-  }, [id])
+    return () => { isActive = false }
+  }, [id, user, authLoading])
 
-  useEffect(() => {
-    if (loading || authLoading || !user || !listing) return
-
-    if (!canModifyListing(user, listing)) {
-      setError('You are not authorized to edit this listing.')
-      setLoading(false)
-    }
-  }, [loading, authLoading, user, listing])
-
-  if (authLoading || loading) {
+  if (status === 'loading') {
     return <div className="max-w-2xl mx-auto px-4 py-10 text-gray-500">Loading...</div>
   }
 
-  if (error) {
+  if (status !== 'ready') {
+    const message = status === 'not_found'
+      ? 'Listing not found.'
+      : 'You are not authorized to edit this listing.'
     return (
       <div className="max-w-2xl mx-auto px-4 py-10 space-y-4 text-center">
-        <p className="text-red-700 text-sm">{error}</p>
+        <p className="text-red-700 text-sm">{message}</p>
         <button
           onClick={() => navigate('/profile')}
           className="text-sm text-red-700 hover:underline"
@@ -70,10 +74,6 @@ export default function EditListingPage() {
     )
   }
 
-  if (!canModifyListing(user, listing)) {
-    return null
-  }
-
   return (
     <CreateListingPage
       mode="edit"
@@ -82,4 +82,3 @@ export default function EditListingPage() {
     />
   )
 }
-

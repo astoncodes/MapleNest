@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
@@ -53,8 +53,22 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
   const [tenancies, setTenancies] = useState([])
 
   const [photos, setPhotos] = useState([])           // File objects
-  const [photoPreviewUrls, setPhotoPreviewUrls] = useState([])
-  const photoPreviewUrlsRef = useRef([])
+  // File -> object URL; derive previews from `photos` so reorder/cap logic
+  // can't desync preview URLs from the underlying file list (see B25).
+  const photoUrlMapRef = useRef(new Map())
+  const successTimeoutRef = useRef(null)
+
+  const photoPreviewUrls = useMemo(
+    () => photos.map(file => {
+      let url = photoUrlMapRef.current.get(file)
+      if (!url) {
+        url = URL.createObjectURL(file)
+        photoUrlMapRef.current.set(file, url)
+      }
+      return url
+    }),
+    [photos]
+  )
 
   const [form, setForm] = useState({
     title: '',
@@ -65,8 +79,8 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
     address: '',
     price: '',
     utilities_included: false,
-    bedrooms: 1,
-    bathrooms: 1,
+    bedrooms: '1',
+    bathrooms: '1',
     square_feet: '',
     available_from: '',
     lease_term: '1_year',
@@ -76,13 +90,30 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
     furnished: false,
   })
 
+  // Drop URLs for files no longer in `photos` (removed or clipped by the 8-cap).
   useEffect(() => {
-    photoPreviewUrlsRef.current = photoPreviewUrls
-  }, [photoPreviewUrls])
+    const live = new Set(photos)
+    for (const [file, url] of photoUrlMapRef.current) {
+      if (!live.has(file)) {
+        URL.revokeObjectURL(url)
+        photoUrlMapRef.current.delete(file)
+      }
+    }
+  }, [photos])
 
   // Revoke all object URLs when the component unmounts to prevent memory leaks
   useEffect(() => {
-    return () => { photoPreviewUrlsRef.current.forEach(url => URL.revokeObjectURL(url)) }
+    const map = photoUrlMapRef.current
+    return () => {
+      for (const url of map.values()) URL.revokeObjectURL(url)
+      map.clear()
+    }
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current)
+    }
   }, [])
 
   useEffect(() => {
@@ -96,8 +127,8 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
         address: listing.address || '',
         price: listing.price ? String(listing.price) : '',
         utilities_included: listing.utilities_included || false,
-        bedrooms: listing.bedrooms || 1,
-        bathrooms: listing.bathrooms || 1,
+        bedrooms: listing.bedrooms ? String(listing.bedrooms) : '1',
+        bathrooms: listing.bathrooms ? String(listing.bathrooms) : '1',
         square_feet: listing.square_feet ? String(listing.square_feet) : '',
         available_from: listing.available_from || '',
         lease_term: listing.lease_term || '1_year',
@@ -146,34 +177,21 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
     const newFiles = Array.from(e.target.files)
     const maxNew = Math.max(0, 8 - existingImages.length)
     const combined = [...photos, ...newFiles].slice(0, maxNew)
-    // Revoke URLs for any existing photos that got cut off by the cap
-    photoPreviewUrls.slice(maxNew).forEach(url => URL.revokeObjectURL(url))
-    // Keep existing URLs for photos we're keeping; create new URLs only for added files
-    const keptUrls = photoPreviewUrls.slice(0, Math.min(photos.length, maxNew))
-    const addedUrls = combined.slice(photos.length).map(f => URL.createObjectURL(f))
     setPhotos(combined)
-    setPhotoPreviewUrls([...keptUrls, ...addedUrls])
     // Reset input so same file can be re-added if needed
     e.target.value = ''
   }
 
   const removePhoto = (index) => {
-    URL.revokeObjectURL(photoPreviewUrls[index])
-    const updatedPhotos = photos.filter((_, i) => i !== index)
-    const updatedUrls = photoPreviewUrls.filter((_, i) => i !== index)
-    setPhotos(updatedPhotos)
-    setPhotoPreviewUrls(updatedUrls)
+    setPhotos(photos.filter((_, i) => i !== index))
   }
 
   const movePhoto = (index, direction) => {
-    const newPhotos = [...photos]
-    const newUrls = [...photoPreviewUrls]
     const targetIndex = index + direction
-    if (targetIndex < 0 || targetIndex >= newPhotos.length) return
+    if (targetIndex < 0 || targetIndex >= photos.length) return
+    const newPhotos = [...photos]
     ;[newPhotos[index], newPhotos[targetIndex]] = [newPhotos[targetIndex], newPhotos[index]]
-    ;[newUrls[index], newUrls[targetIndex]] = [newUrls[targetIndex], newUrls[index]]
     setPhotos(newPhotos)
-    setPhotoPreviewUrls(newUrls)
   }
 
   const removeExistingImage = (imgId) => {
@@ -185,6 +203,7 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
 
   const uploadPhotos = async (listingId, sortOffset = 0) => {
     const uploadedImages = []
+    const uploadedPaths = []
     let failedCount = 0
     let skippedCount = 0
 
@@ -225,6 +244,7 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
         .from('listing-images')
         .getPublicUrl(uploadData.path)
 
+      uploadedPaths.push(uploadData.path)
       uploadedImages.push({
         listing_id: listingId,
         url: urlData.publicUrl,
@@ -240,6 +260,11 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
         .insert(uploadedImages)
 
       if (insertError) {
+        // DB didn't record the rows — pull the blobs back out of storage so
+        // the bucket doesn't accumulate orphans the app can never reach.
+        if (uploadedPaths.length > 0) {
+          await supabase.storage.from('listing-images').remove(uploadedPaths)
+        }
         setUploadProgress(null)
         throw new Error('Photos uploaded, but we could not attach them to the listing. Please try again.')
       }
@@ -258,7 +283,9 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
       const finishSave = (savedListingId, message) => {
         if (message) {
           setError(message)
-          setTimeout(() => {
+          if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current)
+          successTimeoutRef.current = setTimeout(() => {
+            successTimeoutRef.current = null
             if (onSubmitSuccess) onSubmitSuccess()
             else navigate(`/listings/${savedListingId}`)
           }, 2500)
@@ -518,14 +545,14 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
                 <label className={labelClass}>Bedrooms *</label>
                 <select className={inputClass} value={form.bedrooms}
                   onChange={e => update('bedrooms', e.target.value)}>
-                  {[1, 2, 3, 4, 5, 6].map(n => <option key={n} value={n}>{n} bedroom{n > 1 ? 's' : ''}</option>)}
+                  {['1', '2', '3', '4', '5', '6'].map(n => <option key={n} value={n}>{n} bedroom{n !== '1' ? 's' : ''}</option>)}
                 </select>
               </div>
               <div>
                 <label className={labelClass}>Bathrooms *</label>
                 <select className={inputClass} value={form.bathrooms}
                   onChange={e => update('bathrooms', e.target.value)}>
-                  {[1, 1.5, 2, 2.5, 3].map(n => <option key={n} value={n}>{n} bathroom{n > 1 ? 's' : ''}</option>)}
+                  {['1', '1.5', '2', '2.5', '3'].map(n => <option key={n} value={n}>{n} bathroom{n !== '1' ? 's' : ''}</option>)}
                 </select>
               </div>
             </div>
