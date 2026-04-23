@@ -55,6 +55,7 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
   const [photos, setPhotos] = useState([])           // File objects
   const [photoPreviewUrls, setPhotoPreviewUrls] = useState([])
   const photoPreviewUrlsRef = useRef([])
+  const successTimeoutRef = useRef(null)
 
   const [form, setForm] = useState({
     title: '',
@@ -83,6 +84,12 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
   // Revoke all object URLs when the component unmounts to prevent memory leaks
   useEffect(() => {
     return () => { photoPreviewUrlsRef.current.forEach(url => URL.revokeObjectURL(url)) }
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current)
+    }
   }, [])
 
   useEffect(() => {
@@ -258,7 +265,9 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
       const finishSave = (savedListingId, message) => {
         if (message) {
           setError(message)
-          setTimeout(() => {
+          if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current)
+          successTimeoutRef.current = setTimeout(() => {
+            successTimeoutRef.current = null
             if (onSubmitSuccess) onSubmitSuccess()
             else navigate(`/listings/${savedListingId}`)
           }, 2500)
