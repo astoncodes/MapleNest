@@ -275,6 +275,7 @@ export default function ListingDetailPage() {
 
   const handleReport = async () => {
     if (!reportReason) return
+    if (!user) { navigate('/login'); return }
     setReportSubmitting(true)
     setReportError(null)
     const { error } = await supabase.from('reports').insert({
