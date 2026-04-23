@@ -79,8 +79,8 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
     address: '',
     price: '',
     utilities_included: false,
-    bedrooms: 1,
-    bathrooms: 1,
+    bedrooms: '1',
+    bathrooms: '1',
     square_feet: '',
     available_from: '',
     lease_term: '1_year',
@@ -127,8 +127,8 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
         address: listing.address || '',
         price: listing.price ? String(listing.price) : '',
         utilities_included: listing.utilities_included || false,
-        bedrooms: listing.bedrooms || 1,
-        bathrooms: listing.bathrooms || 1,
+        bedrooms: listing.bedrooms ? String(listing.bedrooms) : '1',
+        bathrooms: listing.bathrooms ? String(listing.bathrooms) : '1',
         square_feet: listing.square_feet ? String(listing.square_feet) : '',
         available_from: listing.available_from || '',
         lease_term: listing.lease_term || '1_year',
@@ -545,14 +545,14 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
                 <label className={labelClass}>Bedrooms *</label>
                 <select className={inputClass} value={form.bedrooms}
                   onChange={e => update('bedrooms', e.target.value)}>
-                  {[1, 2, 3, 4, 5, 6].map(n => <option key={n} value={n}>{n} bedroom{n > 1 ? 's' : ''}</option>)}
+                  {['1', '2', '3', '4', '5', '6'].map(n => <option key={n} value={n}>{n} bedroom{n !== '1' ? 's' : ''}</option>)}
                 </select>
               </div>
               <div>
                 <label className={labelClass}>Bathrooms *</label>
                 <select className={inputClass} value={form.bathrooms}
                   onChange={e => update('bathrooms', e.target.value)}>
-                  {[1, 1.5, 2, 2.5, 3].map(n => <option key={n} value={n}>{n} bathroom{n > 1 ? 's' : ''}</option>)}
+                  {['1', '1.5', '2', '2.5', '3'].map(n => <option key={n} value={n}>{n} bathroom{n !== '1' ? 's' : ''}</option>)}
                 </select>
               </div>
             </div>
