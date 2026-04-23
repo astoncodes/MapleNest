@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
@@ -53,9 +53,22 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
   const [tenancies, setTenancies] = useState([])
 
   const [photos, setPhotos] = useState([])           // File objects
-  const [photoPreviewUrls, setPhotoPreviewUrls] = useState([])
-  const photoPreviewUrlsRef = useRef([])
+  // File -> object URL; derive previews from `photos` so reorder/cap logic
+  // can't desync preview URLs from the underlying file list (see B25).
+  const photoUrlMapRef = useRef(new Map())
   const successTimeoutRef = useRef(null)
+
+  const photoPreviewUrls = useMemo(
+    () => photos.map(file => {
+      let url = photoUrlMapRef.current.get(file)
+      if (!url) {
+        url = URL.createObjectURL(file)
+        photoUrlMapRef.current.set(file, url)
+      }
+      return url
+    }),
+    [photos]
+  )
 
   const [form, setForm] = useState({
     title: '',
@@ -77,13 +90,24 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
     furnished: false,
   })
 
+  // Drop URLs for files no longer in `photos` (removed or clipped by the 8-cap).
   useEffect(() => {
-    photoPreviewUrlsRef.current = photoPreviewUrls
-  }, [photoPreviewUrls])
+    const live = new Set(photos)
+    for (const [file, url] of photoUrlMapRef.current) {
+      if (!live.has(file)) {
+        URL.revokeObjectURL(url)
+        photoUrlMapRef.current.delete(file)
+      }
+    }
+  }, [photos])
 
   // Revoke all object URLs when the component unmounts to prevent memory leaks
   useEffect(() => {
-    return () => { photoPreviewUrlsRef.current.forEach(url => URL.revokeObjectURL(url)) }
+    const map = photoUrlMapRef.current
+    return () => {
+      for (const url of map.values()) URL.revokeObjectURL(url)
+      map.clear()
+    }
   }, [])
 
   useEffect(() => {
@@ -153,34 +177,21 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
     const newFiles = Array.from(e.target.files)
     const maxNew = Math.max(0, 8 - existingImages.length)
     const combined = [...photos, ...newFiles].slice(0, maxNew)
-    // Revoke URLs for any existing photos that got cut off by the cap
-    photoPreviewUrls.slice(maxNew).forEach(url => URL.revokeObjectURL(url))
-    // Keep existing URLs for photos we're keeping; create new URLs only for added files
-    const keptUrls = photoPreviewUrls.slice(0, Math.min(photos.length, maxNew))
-    const addedUrls = combined.slice(photos.length).map(f => URL.createObjectURL(f))
     setPhotos(combined)
-    setPhotoPreviewUrls([...keptUrls, ...addedUrls])
     // Reset input so same file can be re-added if needed
     e.target.value = ''
   }
 
   const removePhoto = (index) => {
-    URL.revokeObjectURL(photoPreviewUrls[index])
-    const updatedPhotos = photos.filter((_, i) => i !== index)
-    const updatedUrls = photoPreviewUrls.filter((_, i) => i !== index)
-    setPhotos(updatedPhotos)
-    setPhotoPreviewUrls(updatedUrls)
+    setPhotos(photos.filter((_, i) => i !== index))
   }
 
   const movePhoto = (index, direction) => {
-    const newPhotos = [...photos]
-    const newUrls = [...photoPreviewUrls]
     const targetIndex = index + direction
-    if (targetIndex < 0 || targetIndex >= newPhotos.length) return
+    if (targetIndex < 0 || targetIndex >= photos.length) return
+    const newPhotos = [...photos]
     ;[newPhotos[index], newPhotos[targetIndex]] = [newPhotos[targetIndex], newPhotos[index]]
-    ;[newUrls[index], newUrls[targetIndex]] = [newUrls[targetIndex], newUrls[index]]
     setPhotos(newPhotos)
-    setPhotoPreviewUrls(newUrls)
   }
 
   const removeExistingImage = (imgId) => {
