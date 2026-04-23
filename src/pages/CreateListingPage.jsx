@@ -192,6 +192,7 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
 
   const uploadPhotos = async (listingId, sortOffset = 0) => {
     const uploadedImages = []
+    const uploadedPaths = []
     let failedCount = 0
     let skippedCount = 0
 
@@ -232,6 +233,7 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
         .from('listing-images')
         .getPublicUrl(uploadData.path)
 
+      uploadedPaths.push(uploadData.path)
       uploadedImages.push({
         listing_id: listingId,
         url: urlData.publicUrl,
@@ -247,6 +249,11 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
         .insert(uploadedImages)
 
       if (insertError) {
+        // DB didn't record the rows — pull the blobs back out of storage so
+        // the bucket doesn't accumulate orphans the app can never reach.
+        if (uploadedPaths.length > 0) {
+          await supabase.storage.from('listing-images').remove(uploadedPaths)
+        }
         setUploadProgress(null)
         throw new Error('Photos uploaded, but we could not attach them to the listing. Please try again.')
       }
