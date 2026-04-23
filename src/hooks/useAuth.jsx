@@ -45,18 +45,7 @@ const enrichUser = async (sessionUser) => {
       }
     }
 
-    const persistedRole = normalizeRole(profile.role)
-    // Use DB role as source of truth. Only allow metadata to set landlord on first sign-up
-    // (when profile.role defaults to 'renter' and metadataRole carries the signup intent).
-    const isFirstSignup = profile.role === 'renter' && metadataRole === 'landlord'
-    const role = profile.role === 'admin' ? 'admin' : (isFirstSignup ? 'landlord' : persistedRole)
-
-    if (profile.role !== role && profile.role !== 'admin') {
-      await supabase
-        .from('profiles')
-        .update({ role })
-        .eq('id', sessionUser.id)
-    }
+    const role = normalizeRole(profile.role)
 
     return {
       ...sessionUser,
@@ -87,10 +76,10 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     setLoading(true)
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      refreshUser(session?.user)
-    })
-
+    // onAuthStateChange fires once with INITIAL_SESSION on subscribe, so
+    // we don't also need supabase.auth.getSession() — the double bootstrap
+    // caused refreshUser to run twice on mount and could insert a duplicate
+    // profile when the !profile race-fallback branch fired on both calls.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       refreshUser(session?.user)
     })
