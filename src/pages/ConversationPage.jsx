@@ -84,7 +84,9 @@ export default function ConversationPage() {
     if (msgs?.length) lastMessageAtRef.current = msgs[msgs.length - 1].created_at
     setLoading(false)
 
-    // Mark other party's messages as read + reset own unread counter
+    // Mark other party's messages as read + reset own unread counter.
+    // reset_unread figures out which side to zero from auth.uid() and is atomic,
+    // so two tabs on the same conversation can't race each other (B3).
     await supabase
       .from('messages')
       .update({ read: true })
@@ -92,8 +94,7 @@ export default function ConversationPage() {
       .neq('sender_id', user.id)
       .eq('read', false)
 
-    const unreadField = user.id === convo.renter_id ? 'renter_unread' : 'landlord_unread'
-    await supabase.from('conversations').update({ [unreadField]: 0 }).eq('id', id)
+    await supabase.rpc('reset_unread', { p_conversation_id: id })
   }, [id, navigate, user])
 
   // Initialize: either fetch existing conversation or set up from router state
@@ -175,8 +176,8 @@ export default function ConversationPage() {
             supabase.from('messages').update({ read: true }).eq('id', msg.id)
             const convo = conversationRef.current
             if (convo) {
+              supabase.rpc('reset_unread', { p_conversation_id: convo.id })
               const myUnreadField = user.id === convo.renter_id ? 'renter_unread' : 'landlord_unread'
-              supabase.from('conversations').update({ [myUnreadField]: 0 }).eq('id', convo.id)
               setConversation(prev => prev ? { ...prev, [myUnreadField]: 0 } : prev)
             }
           }
@@ -266,18 +267,21 @@ export default function ConversationPage() {
     setMessages(prev => [...prev, msg])
     if (msg) lastMessageAtRef.current = msg.created_at
 
+    // Atomic +1 on the other party's unread counter via RPC (B3).
+    // Two concurrent sends from the same side now compose correctly instead
+    // of both reading a stale count and writing back the same +1.
     const otherUnreadField = user.id === conversation.renter_id ? 'landlord_unread' : 'renter_unread'
-    const currentOtherUnread = user.id === conversation.renter_id
-      ? (conversation.landlord_unread || 0)
-      : (conversation.renter_unread || 0)
 
     await supabase.from('conversations').update({
       last_message: content,
       last_message_at: new Date().toISOString(),
-      [otherUnreadField]: currentOtherUnread + 1,
     }).eq('id', id)
 
-    setConversation(prev => prev ? { ...prev, [otherUnreadField]: currentOtherUnread + 1 } : prev)
+    await supabase.rpc('bump_unread', { p_conversation_id: id, p_field: otherUnreadField })
+
+    setConversation(prev => prev
+      ? { ...prev, [otherUnreadField]: (prev[otherUnreadField] || 0) + 1 }
+      : prev)
 
     setSending(false)
     inputRef.current?.focus()
