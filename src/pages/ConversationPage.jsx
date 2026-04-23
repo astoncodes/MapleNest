@@ -224,59 +224,27 @@ export default function ConversationPage() {
     setNewMessage('')
     setError(null)
 
-    // New conversation: create the conversation row first, then insert the message
+    // New conversation: create conversation + first message + counter bump atomically
+    // via start_conversation_with_message so a failed message insert can't
+    // leave an orphan conversation row behind (B5).
     if (isNew) {
-      const { data: convo, error: convoErr } = await supabase
-        .from('conversations')
-        .insert({
-          listing_id: newConvoState.listingId,
-          renter_id: user.id,
-          landlord_id: newConvoState.landlordId,
-          unit_id: newConvoState.unitId || null,
-          room_id: newConvoState.roomId || null,
-        })
-        .select('id')
-        .single()
+      const { data: rpcData, error: rpcErr } = await supabase.rpc('start_conversation_with_message', {
+        p_listing_id: newConvoState.listingId,
+        p_landlord_id: newConvoState.landlordId,
+        p_unit_id: newConvoState.unitId || null,
+        p_room_id: newConvoState.roomId || null,
+        p_content: content,
+      })
 
-      if (convoErr) {
-        // Conversation may already exist (race condition) — fall through to existing
-        const { data: existing } = await supabase
-          .from('conversations')
-          .select('id')
-          .eq('listing_id', newConvoState.listingId)
-          .eq('renter_id', user.id)
-          .maybeSingle()
-        if (existing) {
-          setSending(false)
-          setNewMessage(content)
-          navigate(`/messages/${existing.id}`, { replace: true })
-          return
-        }
+      if (rpcErr || !rpcData?.[0]?.conversation_id) {
         setError('Could not start conversation. Please try again.')
         setNewMessage(content)
         setSending(false)
         return
       }
 
-      const { error: sendErr } = await supabase
-        .from('messages')
-        .insert({ conversation_id: convo.id, sender_id: user.id, content })
-
-      if (sendErr) {
-        setError('Failed to send message. Please try again.')
-        setNewMessage(content)
-        setSending(false)
-        return
-      }
-
-      await supabase.from('conversations').update({
-        last_message: content,
-        last_message_at: new Date().toISOString(),
-        landlord_unread: 1,
-      }).eq('id', convo.id)
-
       // Navigate to the real conversation — component remounts and fetches cleanly
-      navigate(`/messages/${convo.id}`, { replace: true })
+      navigate(`/messages/${rpcData[0].conversation_id}`, { replace: true })
       setSending(false)
       return
     }
