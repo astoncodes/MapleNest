@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
@@ -23,11 +23,12 @@ const timeAgo = (dateStr) => {
 function ListingCard({ listing, isSaved, onToggleSave }) {
   if (!listing) return null
   const image = listing.listing_images?.[0]?.url
-  const formatPrice = (p) => `$${Number(p || 0).toLocaleString()}`
   const units = listing.listing_units || []
   const hasAvailableUnits = countAvailable(units) > 0
   const displayPrice = hasAvailableUnits ? resolveLowestPrice(units, listing.price) : listing.price
-  const pricePrefix = hasAvailableUnits ? 'From ' : ''
+  const hasPrice = displayPrice != null && Number(displayPrice) > 0
+  const pricePrefix = hasPrice && hasAvailableUnits ? 'From ' : ''
+  const priceLabel = hasPrice ? `$${Number(displayPrice).toLocaleString()}` : 'Contact for price'
 
   return (
     <Link to={`/listings/${listing.id}`} className="group bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-all overflow-hidden">
@@ -65,7 +66,7 @@ function ListingCard({ listing, isSaved, onToggleSave }) {
             {listing.title}
           </h3>
           <span className="text-red-700 font-bold text-sm whitespace-nowrap">
-                {pricePrefix}{formatPrice(displayPrice)}<span className="text-gray-400 font-normal">/mo</span>
+                {pricePrefix}{priceLabel}{hasPrice && <span className="text-gray-400 font-normal">/mo</span>}
               </span>
         </div>
 
@@ -110,6 +111,9 @@ export default function ListingsPage() {
     parking: false,
     utilitiesIncluded: false,
   })
+  // Debounced copy used for the actual query — keystrokes in min/max price
+  // otherwise fire a fetch on every digit.
+  const [debouncedFilters, setDebouncedFilters] = useState(filters)
 
   const { user } = useAuth()
   const { isSaved, toggleSave } = useSavedListings()
@@ -117,7 +121,23 @@ export default function ListingsPage() {
   const updateFilter = (key, value) => setFilters(prev => ({ ...prev, [key]: value }))
 
   useEffect(() => {
-    setSearch(queryFromParams || '')
+    const t = setTimeout(() => setDebouncedFilters(filters), 300)
+    return () => clearTimeout(t)
+  }, [filters])
+
+  // Only adopt a URL q change when we haven't picked up fresh typing since
+  // the last sync — keeps an in-progress search from getting clobbered when
+  // the URL param updates (e.g., programmatic setSearchParams elsewhere).
+  const lastSyncedQueryRef = useRef(queryFromParams)
+  const hasUnsyncedTypingRef = useRef(false)
+
+  useEffect(() => {
+    if (lastSyncedQueryRef.current === queryFromParams) return
+    lastSyncedQueryRef.current = queryFromParams
+    if (!hasUnsyncedTypingRef.current) {
+      setSearch(queryFromParams || '')
+    }
+    hasUnsyncedTypingRef.current = false
   }, [queryFromParams])
 
   const fetchListings = useCallback(async () => {
@@ -130,34 +150,39 @@ export default function ListingsPage() {
       .eq('status', 'active')
       .order('created_at', { ascending: false });
 
-    if (filters.city !== 'All')
-      query = query.eq('city', filters.city);
+    if (debouncedFilters.city !== 'All')
+      query = query.eq('city', debouncedFilters.city);
 
-    if (filters.type !== 'All')
-      query = query.eq('property_type', filters.type);
+    if (debouncedFilters.type !== 'All')
+      query = query.eq('property_type', debouncedFilters.type);
 
-    if (filters.minPrice)
-      query = query.gte('price', Number(filters.minPrice));
+    if (debouncedFilters.minPrice)
+      query = query.gte('price', Number(debouncedFilters.minPrice));
 
-    if (filters.maxPrice)
-      query = query.lte('price', Number(filters.maxPrice));
+    if (debouncedFilters.maxPrice)
+      query = query.lte('price', Number(debouncedFilters.maxPrice));
 
-    if (filters.bedrooms !== 'Any')
-      query = query.gte('bedrooms', Number(filters.bedrooms));
+    if (debouncedFilters.bedrooms !== 'Any')
+      query = query.gte('bedrooms', Number(debouncedFilters.bedrooms));
 
 
-    if (filters.petFriendly)
+    if (debouncedFilters.petFriendly)
       query = query.eq('pet_friendly', true);
 
-    if (filters.parking)
+    if (debouncedFilters.parking)
       query = query.eq('parking_available', true);
 
-    if (filters.utilitiesIncluded)
+    if (debouncedFilters.utilitiesIncluded)
       query = query.eq('utilities_included', true);
 
     if (queryFromParams?.trim()) {
-      const q = queryFromParams.trim().replace(/[(),%_]/g, ' ');
-      query = query.or(`title.ilike.%${q}%,neighbourhood.ilike.%${q}%,description.ilike.%${q}%`);
+      // .or() splits on commas/parens, and ilike treats %/_ as wildcards, so
+      // strip everything that isn't a word char, whitespace, or dash before
+      // interpolating. Prevents 400s from "foo,bar" or SQL-pattern injection.
+      const q = queryFromParams.trim().replace(/[^\w\s-]/g, ' ').replace(/\s+/g, ' ').trim();
+      if (q) {
+        query = query.or(`title.ilike.%${q}%,neighbourhood.ilike.%${q}%,description.ilike.%${q}%`);
+      }
     }
 
     const { data, error } = await query;
@@ -173,7 +198,7 @@ export default function ListingsPage() {
   } finally {
     setLoading(false);
   }
-}, [filters, queryFromParams]);
+}, [debouncedFilters, queryFromParams]);
 
   useEffect(() => {
     fetchListings()
@@ -187,6 +212,7 @@ export default function ListingsPage() {
     } else {
       delete params.q
     }
+    hasUnsyncedTypingRef.current = false
     setSearchParams(params, { replace: true })
     // Do NOT call fetchListings() here — the useEffect([filters, queryFromParams]) handles it
   }
@@ -222,7 +248,7 @@ export default function ListingsPage() {
         <input
           type="text"
           value={search}
-          onChange={e => setSearch(e.target.value)}
+          onChange={e => { hasUnsyncedTypingRef.current = true; setSearch(e.target.value) }}
           placeholder="Search by title, neighbourhood, keyword..."
           className="flex-1 border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
         />
