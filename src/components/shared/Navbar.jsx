@@ -5,25 +5,26 @@ import { useAuth } from '../../hooks/useAuth'
 
 export default function Navbar() {
   const { user, signOut, isLandlord } = useAuth()
+  const userId = user?.id
   const navigate = useNavigate()
   const [unreadCount, setUnreadCount] = useState(0)
   const [menuOpen, setMenuOpen] = useState(false)
 
   useEffect(() => {
-    if (!user) { setUnreadCount(0); return }
+    if (!userId) { setUnreadCount(0); return }
     supabase
       .from('conversations')
       .select('renter_id, landlord_id, renter_unread, landlord_unread')
-      .or(`renter_id.eq.${user.id},landlord_id.eq.${user.id}`)
+      .or(`renter_id.eq.${userId},landlord_id.eq.${userId}`)
       .then(({ data, error }) => {
         if (error) { console.error('Navbar: failed to fetch unread counts', error); return }
         if (!data) return
         const total = data.reduce((sum, c) => {
-          return sum + (user.id === c.renter_id ? (c.renter_unread || 0) : (c.landlord_unread || 0))
+          return sum + (userId === c.renter_id ? (c.renter_unread || 0) : (c.landlord_unread || 0))
         }, 0)
         setUnreadCount(total)
       })
-  }, [user])
+  }, [userId])
 
   // Close menu on route change
   useEffect(() => { setMenuOpen(false) }, [navigate])

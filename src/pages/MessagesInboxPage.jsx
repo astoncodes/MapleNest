@@ -30,12 +30,13 @@ function Avatar({ profile }) {
 
 export default function MessagesInboxPage() {
   const { user } = useAuth()
+  const userId = user?.id
   const [conversations, setConversations] = useState([])
   const [loading, setLoading] = useState(true)
   const [pendingReviews, setPendingReviews] = useState({}) // { conversationId: { tenancy, hasSubmitted } }
 
   const fetchConversations = useCallback(async () => {
-    if (!user) return
+    if (!userId) return
     setLoading(true)
     const { data } = await supabase
       .from('conversations')
@@ -47,21 +48,21 @@ export default function MessagesInboxPage() {
         unit:unit_id(id, unit_name),
         room:room_id(id, room_name)
       `)
-      .or(`renter_id.eq.${user.id},landlord_id.eq.${user.id}`)
+      .or(`renter_id.eq.${userId},landlord_id.eq.${userId}`)
       .not('last_message', 'is', null)
       .order('last_message_at', { ascending: false })
 
     setConversations(data || [])
     setLoading(false)
-  }, [user])
+  }, [userId])
 
   const fetchPendingReviews = useCallback(async () => {
-    if (!user) return
+    if (!userId) return
     const { data: tenancies } = await supabase
       .from('tenancies')
       .select('id, listing_id, renter_id, landlord_id, conversation_id, move_out, status, review_window_closes_at')
       .eq('status', 'ended')
-      .or(`renter_id.eq.${user.id},landlord_id.eq.${user.id}`)
+      .or(`renter_id.eq.${userId},landlord_id.eq.${userId}`)
       .gt('review_window_closes_at', new Date().toISOString())
 
     if (!tenancies?.length) return
@@ -70,7 +71,7 @@ export default function MessagesInboxPage() {
     const { data: existingReviews } = await supabase
       .from('reviews')
       .select('tenancy_id')
-      .eq('reviewer_id', user.id)
+      .eq('reviewer_id', userId)
       .in('tenancy_id', tenancyIds)
 
     const reviewedSet = new Set((existingReviews || []).map(r => r.tenancy_id))
@@ -82,13 +83,13 @@ export default function MessagesInboxPage() {
       }
     }
     setPendingReviews(map)
-  }, [user])
+  }, [userId])
 
   useEffect(() => {
-    if (!user) return
+    if (!userId) return
     fetchConversations()
     fetchPendingReviews()
-  }, [fetchConversations, fetchPendingReviews, user])
+  }, [fetchConversations, fetchPendingReviews, userId])
 
   if (loading) return (
     <div className="max-w-2xl mx-auto px-4 py-10 space-y-3">
@@ -120,7 +121,7 @@ export default function MessagesInboxPage() {
       ) : (
         <div className="space-y-2">
           {conversations.map(convo => {
-            const isRenter = user.id === convo.renter?.id
+            const isRenter = userId === convo.renter?.id
             const other = isRenter ? convo.landlord : convo.renter
             const unread = isRenter ? (convo.renter_unread || 0) : (convo.landlord_unread || 0)
             const listingImage = convo.listing?.listing_images?.find(i => i.is_primary) || convo.listing?.listing_images?.[0]
@@ -164,7 +165,7 @@ export default function MessagesInboxPage() {
                 {pending && !pending.hasSubmitted && (
                   <ReviewPromptBanner
                     tenancy={pending.tenancy}
-                    currentUserId={user.id}
+                    currentUserId={userId}
                     hasSubmittedReview={pending.hasSubmitted}
                     reviewWindowClosesAt={pending.tenancy.review_window_closes_at}
                     listingTitle={convo.listing?.title}
