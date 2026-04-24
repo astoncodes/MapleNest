@@ -28,6 +28,7 @@ const formatTime = (dateStr) => {
 export default function ConversationPage() {
   const { id } = useParams()
   const { user } = useAuth()
+  const userId = user?.id
   const navigate = useNavigate()
   const location = useLocation()
   const isNew = id === 'new'
@@ -68,7 +69,7 @@ export default function ConversationPage() {
       .single()
 
     if (convoErr || !convo) { navigate('/messages'); return }
-    if (convo.renter_id !== user.id && convo.landlord_id !== user.id) {
+    if (convo.renter_id !== userId && convo.landlord_id !== userId) {
       navigate('/messages'); return
     }
 
@@ -89,12 +90,12 @@ export default function ConversationPage() {
       .from('messages')
       .update({ read: true })
       .eq('conversation_id', id)
-      .neq('sender_id', user.id)
+      .neq('sender_id', userId)
       .eq('read', false)
 
-    const unreadField = user.id === convo.renter_id ? 'renter_unread' : 'landlord_unread'
+    const unreadField = userId === convo.renter_id ? 'renter_unread' : 'landlord_unread'
     await supabase.from('conversations').update({ [unreadField]: 0 }).eq('id', id)
-  }, [id, navigate, user])
+  }, [id, navigate, userId])
 
   // Initialize: either fetch existing conversation or set up from router state
   useEffect(() => {
@@ -102,7 +103,7 @@ export default function ConversationPage() {
       if (!newConvoState?.listingId) { navigate('/messages'); return }
       setConversation({
         id: null,
-        renter_id: user.id,
+        renter_id: userId,
         landlord_id: newConvoState.landlordId,
         listing: newConvoState.listing,
         landlord: newConvoState.landlord,
@@ -117,8 +118,10 @@ export default function ConversationPage() {
       setLoading(false)
       return
     }
-    if (user) fetchConversation()
-  }, [fetchConversation, id, isNew, navigate, newConvoState, user])
+    if (userId) fetchConversation()
+    // user?.profile only reads the initial value for optimistic display in the isNew branch; intentionally excluded to avoid re-running on auth-profile object identity changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchConversation, id, isNew, navigate, newConvoState, userId])
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -143,24 +146,24 @@ export default function ConversationPage() {
           .from('reviews')
           .select('id')
           .eq('tenancy_id', data.id)
-          .eq('reviewer_id', user.id)
+          .eq('reviewer_id', userId)
           .maybeSingle()
         setHasSubmittedReview(!!existingReview)
       }
     }
     fetchTenancy()
-  }, [conversation?.id, isNew, user])
+  }, [conversation?.id, isNew, userId])
 
   // Real-time subscription for new messages from the other party
   useEffect(() => {
-    if (!id || isNew || !user) return
+    if (!id || isNew || !userId) return
     const channel = supabase
       .channel(`messages-${id}`)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${id}` },
         async (payload) => {
-          if (payload.new.sender_id === user.id) return
+          if (payload.new.sender_id === userId) return
           const { data: msg } = await supabase
             .from('messages')
             .select('id, content, created_at, read, sender_id, sender:sender_id(id, full_name, avatar_url, email)')
@@ -175,7 +178,7 @@ export default function ConversationPage() {
             supabase.from('messages').update({ read: true }).eq('id', msg.id)
             const convo = conversationRef.current
             if (convo) {
-              const myUnreadField = user.id === convo.renter_id ? 'renter_unread' : 'landlord_unread'
+              const myUnreadField = userId === convo.renter_id ? 'renter_unread' : 'landlord_unread'
               supabase.from('conversations').update({ [myUnreadField]: 0 }).eq('id', convo.id)
               setConversation(prev => prev ? { ...prev, [myUnreadField]: 0 } : prev)
             }
@@ -184,11 +187,11 @@ export default function ConversationPage() {
       )
       .subscribe()
     return () => { supabase.removeChannel(channel) }
-  }, [id, isNew, user])
+  }, [id, isNew, userId])
 
   // Polling fallback — catches messages real-time misses (e.g. replication not enabled)
   useEffect(() => {
-    if (!id || isNew || !user) return
+    if (!id || isNew || !userId) return
     const poll = setInterval(async () => {
       const since = lastMessageAtRef.current
       if (!since) return
@@ -205,7 +208,7 @@ export default function ConversationPage() {
         if (!incoming.length) return prev
         lastMessageAtRef.current = data[data.length - 1].created_at
         // Mark other party's new messages as read
-        const others = incoming.filter(m => m.sender_id !== user.id)
+        const others = incoming.filter(m => m.sender_id !== userId)
         if (others.length) {
           supabase.from('messages').update({ read: true }).in('id', others.map(m => m.id))
         }
@@ -213,7 +216,7 @@ export default function ConversationPage() {
       })
     }, 5000)
     return () => clearInterval(poll)
-  }, [id, isNew, user])
+  }, [id, isNew, userId])
 
   const handleSend = async (e) => {
     e.preventDefault()
@@ -230,7 +233,7 @@ export default function ConversationPage() {
         .from('conversations')
         .insert({
           listing_id: newConvoState.listingId,
-          renter_id: user.id,
+          renter_id: userId,
           landlord_id: newConvoState.landlordId,
           unit_id: newConvoState.unitId || null,
           room_id: newConvoState.roomId || null,
@@ -244,7 +247,7 @@ export default function ConversationPage() {
           .from('conversations')
           .select('id')
           .eq('listing_id', newConvoState.listingId)
-          .eq('renter_id', user.id)
+          .eq('renter_id', userId)
           .maybeSingle()
         if (existing) {
           setSending(false)
@@ -260,7 +263,7 @@ export default function ConversationPage() {
 
       const { error: sendErr } = await supabase
         .from('messages')
-        .insert({ conversation_id: convo.id, sender_id: user.id, content })
+        .insert({ conversation_id: convo.id, sender_id: userId, content })
 
       if (sendErr) {
         setError('Failed to send message. Please try again.')
@@ -284,7 +287,7 @@ export default function ConversationPage() {
     // Existing conversation
     const { data: msg, error: sendErr } = await supabase
       .from('messages')
-      .insert({ conversation_id: id, sender_id: user.id, content })
+      .insert({ conversation_id: id, sender_id: userId, content })
       .select('id, content, created_at, read, sender_id, sender:sender_id(id, full_name, avatar_url, email)')
       .single()
 
@@ -298,8 +301,8 @@ export default function ConversationPage() {
     setMessages(prev => [...prev, msg])
     if (msg) lastMessageAtRef.current = msg.created_at
 
-    const otherUnreadField = user.id === conversation.renter_id ? 'landlord_unread' : 'renter_unread'
-    const currentOtherUnread = user.id === conversation.renter_id
+    const otherUnreadField = userId === conversation.renter_id ? 'landlord_unread' : 'renter_unread'
+    const currentOtherUnread = userId === conversation.renter_id
       ? (conversation.landlord_unread || 0)
       : (conversation.renter_unread || 0)
 
@@ -330,7 +333,7 @@ export default function ConversationPage() {
 
   const listingImage = conversation?.listing?.listing_images?.find(i => i.is_primary)
     || conversation?.listing?.listing_images?.[0]
-  const other = user.id === conversation?.renter_id ? conversation?.landlord : conversation?.renter
+  const other = userId === conversation?.renter_id ? conversation?.landlord : conversation?.renter
 
   return (
     <div className="max-w-2xl mx-auto flex flex-col" style={{ height: 'calc(100vh - 64px)' }}>
@@ -359,7 +362,7 @@ export default function ConversationPage() {
       </div>
 
       {/* Tenancy bar — landlord only */}
-      {user.id === conversation?.landlord_id && conversation?.listing?.id && (
+      {userId === conversation?.landlord_id && conversation?.listing?.id && (
         <TenancyBar
           tenancy={tenancy?.status === 'active' ? tenancy : null}
           onEnded={(updated) => setTenancy(updated)}
@@ -372,7 +375,7 @@ export default function ConversationPage() {
         <div className="px-4 py-2 flex-shrink-0">
           <ReviewPromptBanner
             tenancy={tenancy}
-            currentUserId={user.id}
+            currentUserId={userId}
             hasSubmittedReview={hasSubmittedReview}
             reviewWindowClosesAt={tenancy.review_window_closes_at}
             listingTitle={conversation?.listing?.title}
@@ -389,7 +392,7 @@ export default function ConversationPage() {
           </p>
         )}
         {messages.map(msg => {
-          const isOwn = msg.sender_id === user.id
+          const isOwn = msg.sender_id === userId
           return (
             <div key={msg.id} className={`flex items-end gap-2 ${isOwn ? 'justify-end' : 'justify-start'}`}>
               {!isOwn && <Avatar profile={msg.sender} />}
