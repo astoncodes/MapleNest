@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { mapSupabaseError } from '../lib/supabaseErrors'
 import { useAuth } from '../hooks/useAuth'
+
+const AVATAR_MAX_BYTES = 5 * 1024 * 1024 // 5 MB
+const AVATAR_MAX_LABEL = '5 MB'
 
 
 // ── Star rating display ──────────────────────────────────────────────────────
@@ -125,7 +129,7 @@ export default function ProfilePage() {
       bio: editForm.bio,
     }).eq('id', user.id)
     setSaving(false)
-    if (error) { setSaveError(error.message) } else {
+    if (error) { setSaveError(mapSupabaseError(error, 'Could not save your profile. Please try again.')) } else {
       setSaveSuccess(true); setEditing(false)
       setProfile(prev => ({ ...prev, ...editForm }))
       setTimeout(() => setSaveSuccess(false), 3000)
@@ -136,22 +140,65 @@ export default function ProfilePage() {
   const handleAvatarUpload = async (e) => {
     const file = e.target.files[0]
     if (!file) return
+
+    // Client-side validation (mirrors uploadPhotos in CreateListingPage).
+    if (!file.type.startsWith('image/')) {
+      setAvatarError('Please choose an image file (JPG, PNG, WebP, or HEIC).')
+      e.target.value = ''
+      return
+    }
+    if (file.size > AVATAR_MAX_BYTES) {
+      setAvatarError(`That image is too large. Please keep it under ${AVATAR_MAX_LABEL}.`)
+      e.target.value = ''
+      return
+    }
+
     setAvatarUploading(true)
     setAvatarError(null)
 
     try {
-      const ext = file.name.split('.').pop()
-      const path = `avatars/${user.id}.${ext}`
-      const { error: uploadError } = await supabase.storage.from('listing-images').upload(path, file, { upsert: true })
+      const ext = (file.name.split('.').pop() || 'jpg').toLowerCase()
+      // New path convention: {user_id}/{timestamp}.{ext}. Timestamp keeps
+      // the URL unique so browsers / CDNs don't serve a stale cached copy
+      // after the user changes their avatar.
+      const newName = `${Date.now()}.${ext}`
+      const newPath = `${user.id}/${newName}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(newPath, file, { cacheControl: '3600', upsert: false, contentType: file.type })
       if (uploadError) throw uploadError
 
-      const { data } = supabase.storage.from('listing-images').getPublicUrl(path)
-      const { error: updateError } = await supabase.from('profiles').update({ avatar_url: data.publicUrl }).eq('id', user.id)
-      if (updateError) throw updateError
+      const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(newPath)
 
-      setProfile(prev => ({ ...prev, avatar_url: data.publicUrl }))
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: urlData.publicUrl })
+        .eq('id', user.id)
+      if (updateError) {
+        // DB never recorded the new URL — pull the freshly uploaded blob back
+        // out so we don't leave orphans in the bucket.
+        await supabase.storage.from('avatars').remove([newPath])
+        throw updateError
+      }
+
+      // Remove any previous avatar objects this user had in the bucket so
+      // we don't accumulate one orphan per re-upload.
+      const { data: existingObjects } = await supabase.storage
+        .from('avatars')
+        .list(user.id)
+      if (existingObjects?.length) {
+        const stalePaths = existingObjects
+          .map(obj => `${user.id}/${obj.name}`)
+          .filter(p => p !== newPath)
+        if (stalePaths.length) {
+          await supabase.storage.from('avatars').remove(stalePaths)
+        }
+      }
+
+      setProfile(prev => ({ ...prev, avatar_url: urlData.publicUrl }))
     } catch (err) {
-      setAvatarError(err.message || 'Could not upload avatar. Please try again.')
+      setAvatarError(mapSupabaseError(err, 'Could not upload avatar. Please try again.'))
     } finally {
       setAvatarUploading(false)
       e.target.value = ''
@@ -167,7 +214,7 @@ export default function ProfilePage() {
     setPwLoading(true)
     const { error } = await supabase.auth.updateUser({ password: pwForm.next })
     setPwLoading(false)
-    if (error) { setPwError(error.message) } else {
+    if (error) { setPwError(mapSupabaseError(error, 'Could not update your password. Please try again.')) } else {
       setPwSuccess(true); setPwForm({ current: '', next: '', confirm: '' })
       setTimeout(() => setPwSuccess(false), 4000)
     }
