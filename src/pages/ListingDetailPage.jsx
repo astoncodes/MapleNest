@@ -160,6 +160,8 @@ export default function ListingDetailPage() {
   const [listing, setListing] = useState(null)
   const [landlord, setLandlord] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [notFound, setNotFound] = useState(false)
+  const [fetchError, setFetchError] = useState(null)
   const [contacting, setContacting] = useState(false)
   const { isSaved, toggleSave } = useSavedListings()
   const [contactError, setContactError] = useState(null)
@@ -171,13 +173,27 @@ export default function ListingDetailPage() {
   const [reportError, setReportError] = useState(null)
 
   const fetchListing = useCallback(async () => {
+    setLoading(true)
+    setNotFound(false)
+    setFetchError(null)
+
     const { data, error } = await supabase
       .from('listings')
       .select('*, listing_images(id, url, is_primary, sort_order), listing_units(id, unit_name, floor, price, available_from, notes, status, room_rental, sort_order, listing_unit_rooms(id, room_name, price, available_from, status, sort_order))')
       .eq('id', id)
       .single()
 
-    if (error || !data) { navigate('/listings'); return }
+    if (error) {
+      // PGRST116 = PostgREST "no rows returned" — that's a genuine 404.
+      // Anything else (network, 5xx, auth hiccup) is transient and should
+      // offer a retry rather than silently punting the user to /listings.
+      if (error.code === 'PGRST116') setNotFound(true)
+      else setFetchError(error.message || 'Could not load this listing.')
+      setLoading(false)
+      return
+    }
+
+    if (!data) { setNotFound(true); setLoading(false); return }
 
     // Sort images: primary first, then by sort_order
     if (data.listing_images?.length > 0) {
@@ -201,7 +217,7 @@ export default function ListingDetailPage() {
 
     // Atomic increment — avoids race condition under concurrent views
     supabase.rpc('increment_views', { p_listing_id: id })
-  }, [id, navigate])
+  }, [id])
 
   useEffect(() => {
     fetchListing()
@@ -297,6 +313,34 @@ export default function ListingDetailPage() {
       <div className="h-80 bg-gray-200 rounded-xl" />
       <div className="h-6 bg-gray-200 rounded w-1/2" />
       <div className="h-4 bg-gray-200 rounded w-1/3" />
+    </div>
+  )
+
+  if (notFound || !listing) return (
+    <div className="max-w-xl mx-auto px-4 py-16 text-center space-y-4">
+      <div className="text-5xl">🏚</div>
+      <p className="font-medium text-gray-700">Listing not found</p>
+      <p className="text-sm text-gray-500">It may have been removed or the link is incorrect.</p>
+      <Link to="/listings" className="inline-block text-red-700 text-sm font-medium hover:underline">
+        Browse listings
+      </Link>
+    </div>
+  )
+
+  if (fetchError) return (
+    <div className="max-w-xl mx-auto px-4 py-16 text-center space-y-4">
+      <div className="text-4xl">⚠️</div>
+      <p className="font-medium text-gray-700">We couldn’t load this listing</p>
+      <p className="text-sm text-gray-500">{fetchError}</p>
+      <div className="flex justify-center gap-3">
+        <button onClick={fetchListing}
+          className="px-4 py-2 text-sm font-medium bg-red-700 text-white rounded-lg hover:bg-red-800 transition">
+          Try again
+        </button>
+        <Link to="/listings" className="text-sm text-gray-500 hover:text-gray-700 self-center">
+          Back to listings
+        </Link>
+      </div>
     </div>
   )
 
