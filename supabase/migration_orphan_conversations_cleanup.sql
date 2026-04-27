@@ -13,8 +13,14 @@
 -- and then drop the backup table once you're confident.
 
 -- 1. Snapshot the orphans we are about to delete so the operation is reversible.
+-- Note: LIKE ... INCLUDING ALL copies indexes/defaults/storage but NOT RLS,
+-- so we explicitly enable RLS with no policies. That blocks all access via
+-- the anon/authenticated API keys; only service_role (e.g. the SQL editor)
+-- can read this backup, which is what we want for a recovery-only artifact.
 CREATE TABLE IF NOT EXISTS public.orphaned_conversations_backup
   (LIKE public.conversations INCLUDING ALL);
+
+ALTER TABLE public.orphaned_conversations_backup ENABLE ROW LEVEL SECURITY;
 
 INSERT INTO public.orphaned_conversations_backup
 SELECT c.*
