@@ -59,7 +59,7 @@ export default function HomePage() {
             Find Your Home in PEI 🍁
           </h1>
           <p className="text-red-100 text-lg mb-8">
-            Verified listings for UPEI students, young professionals, and Island residents.
+            Verified listings for students, young professionals, and Island residents.
             With a view to expand country wide.
             Safe, local, and community-driven.
           </p>

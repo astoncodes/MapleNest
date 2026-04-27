@@ -96,10 +96,20 @@ export default function ProfilePage() {
       // Lazy-expire any reviews past their window for this profile
       await supabase.rpc('expire_pending_reviews', { p_profile_id: viewingId })
 
+      // Owners need to see all their listings (incl. draft / rented / removed)
+      // so they can edit or relist them. Non-owners stay restricted to active.
+      // RLS on public.listings (see migration_listings_owner_select.sql) is what
+      // actually enforces this server-side; the .eq filter here just trims the
+      // payload for the public view.
+      let listingsQuery = supabase.from('listings')
+        .select('id, title, city, property_type, status, price, created_at, listing_images(url, is_primary)')
+        .eq('landlord_id', viewingId)
+        .order('created_at', { ascending: false })
+      if (!isOwn) listingsQuery = listingsQuery.eq('status', 'active')
+
       const [{ data: prof }, { data: listData }, { data: revData }, { data: savedData }] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', viewingId).single(),
-        supabase.from('listings').select('id, title, city, property_type, status, price, created_at, listing_images(url, is_primary)')
-          .eq('landlord_id', viewingId).eq('status', 'active').order('created_at', { ascending: false }),
+        listingsQuery,
         supabase.from('reviews').select('*, reviewer:reviewer_id(full_name, avatar_url, email), tenancy:tenancy_id(listing:listing_id(title), unit:unit_id(unit_name))')
           .eq('reviewee_id', viewingId).eq('visible', true).order('created_at', { ascending: false }),
         isOwn
@@ -388,7 +398,7 @@ export default function ProfilePage() {
 
       {/* ── Listings tab ── */}
       {tab === 'listings' && (
-        <Section title="Active Listings"
+        <Section title={isOwn ? 'Your Listings' : 'Active Listings'}
           action={isOwn && <Link to="/create-listing" className="text-xs font-medium text-red-700 border border-red-200 px-3 py-1.5 rounded-lg hover:bg-red-50">+ New Listing</Link>}>
           {listings.length === 0 ? (
             <p className="text-sm text-gray-400 text-center py-6">No active listings yet.</p>

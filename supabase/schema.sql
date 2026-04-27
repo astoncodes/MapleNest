@@ -1,6 +1,7 @@
 -- =============================================
 -- MapleNest Database Schema
 -- Safe to run on an existing Supabase project (idempotent)
+-- Ordering invariant: any table referenced by a FK must be declared above its first user.
 -- =============================================
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
@@ -77,6 +78,34 @@ CREATE TABLE IF NOT EXISTS public.saved_listings (
   listing_id UUID REFERENCES public.listings(id) ON DELETE CASCADE NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(user_id, listing_id)
+);
+
+-- ── listing_units ─────────────────────────────────────────────────────────────
+-- NOTE: Declared here (before conversations) because conversations.unit_id FKs to it.
+CREATE TABLE IF NOT EXISTS public.listing_units (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  listing_id uuid NOT NULL REFERENCES public.listings(id) ON DELETE CASCADE,
+  unit_name text NOT NULL CHECK (char_length(unit_name) <= 60),
+  floor int,
+  price int,
+  available_from date,
+  notes text CHECK (char_length(notes) <= 300),
+  status text NOT NULL DEFAULT 'available' CHECK (status IN ('available', 'rented')),
+  room_rental boolean NOT NULL DEFAULT false,
+  sort_order int NOT NULL DEFAULT 0,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- ── listing_unit_rooms ────────────────────────────────────────────────────────
+-- NOTE: Declared here (before conversations) because conversations.room_id FKs to it.
+CREATE TABLE IF NOT EXISTS public.listing_unit_rooms (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  unit_id uuid NOT NULL REFERENCES public.listing_units(id) ON DELETE CASCADE,
+  room_name text NOT NULL CHECK (char_length(room_name) <= 60),
+  price int,
+  available_from date,
+  status text NOT NULL DEFAULT 'available' CHECK (status IN ('available', 'occupied')),
+  sort_order int NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS public.conversations (
@@ -520,21 +549,8 @@ CREATE INDEX IF NOT EXISTS idx_listing_units_listing_id_sort_order
 CREATE INDEX IF NOT EXISTS idx_listing_unit_rooms_unit_id
   ON public.listing_unit_rooms (unit_id);
 
--- ── listing_units ─────────────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS public.listing_units (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  listing_id uuid NOT NULL REFERENCES public.listings(id) ON DELETE CASCADE,
-  unit_name text NOT NULL CHECK (char_length(unit_name) <= 60),
-  floor int,
-  price int,
-  available_from date,
-  notes text CHECK (char_length(notes) <= 300),
-  status text NOT NULL DEFAULT 'available' CHECK (status IN ('available', 'rented')),
-  room_rental boolean NOT NULL DEFAULT false,
-  sort_order int NOT NULL DEFAULT 0,
-  created_at timestamptz NOT NULL DEFAULT now()
-);
-
+-- ── listing_units RLS ─────────────────────────────────────────────────────────
+-- (Table itself is declared earlier, before public.conversations, so FKs resolve.)
 ALTER TABLE public.listing_units ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "listing_units_public_read" ON public.listing_units FOR SELECT USING (true);
@@ -542,17 +558,8 @@ CREATE POLICY "listing_units_landlord_write" ON public.listing_units FOR ALL
   USING (auth.uid() = (SELECT landlord_id FROM public.listings WHERE id = listing_id))
   WITH CHECK (auth.uid() = (SELECT landlord_id FROM public.listings WHERE id = listing_id));
 
--- ── listing_unit_rooms ────────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS public.listing_unit_rooms (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  unit_id uuid NOT NULL REFERENCES public.listing_units(id) ON DELETE CASCADE,
-  room_name text NOT NULL CHECK (char_length(room_name) <= 60),
-  price int,
-  available_from date,
-  status text NOT NULL DEFAULT 'available' CHECK (status IN ('available', 'occupied')),
-  sort_order int NOT NULL DEFAULT 0
-);
-
+-- ── listing_unit_rooms RLS ────────────────────────────────────────────────────
+-- (Table itself is declared earlier, before public.conversations, so FKs resolve.)
 ALTER TABLE public.listing_unit_rooms ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "listing_unit_rooms_public_read" ON public.listing_unit_rooms FOR SELECT USING (true);
