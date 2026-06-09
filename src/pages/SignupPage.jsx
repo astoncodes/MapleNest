@@ -31,62 +31,73 @@ export default function SignupPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4">
+      <div className="min-h-screen bg-canvas flex items-center justify-center px-4">
         <div className="text-center max-w-sm">
           <div className="text-5xl mb-4">📬</div>
-          <h2 className="text-xl font-bold text-gray-800 mb-2">Check your email!</h2>
-          <p className="text-gray-500 text-sm">We sent a verification link to <strong>{email}</strong>. Click it to activate your account.</p>
+          <h2 className="text-xl font-semibold text-ink mb-2">Check your email!</h2>
+          <p className="text-steel text-sm">We sent a verification link to <strong className="text-charcoal">{email}</strong>. Click it to activate your account.</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen bg-canvas flex items-center justify-center px-4">
+      <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <span className="text-4xl">🍁</span>
-          <h1 className="text-2xl font-bold text-gray-800 mt-2">Join MapleNest</h1>
-          <p className="text-gray-500 text-sm mt-1">Find or list housing in PEI — free forever</p>
+          <h1 className="text-2xl font-semibold text-ink mt-2">Join MapleNest</h1>
+          <p className="text-steel text-sm mt-1">Find or list housing in PEI — free forever</p>
         </div>
-        <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm space-y-4">
+
+        <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-hairline shadow-card p-6 space-y-4">
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg">{error}</div>
+            <div className="bg-maple-light border border-maple-muted text-maple-red text-sm px-4 py-3 rounded-lg">{error}</div>
           )}
+
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">I am a...</label>
+            <label className="block text-sm font-medium text-charcoal mb-2">I am a...</label>
             <div className="grid grid-cols-2 gap-2">
               {['renter', 'landlord'].map(r => (
                 <button key={r} type="button" onClick={() => setRole(r)}
-                  className={`py-2 rounded-lg border text-sm font-medium capitalize transition ${
-                    role === r ? 'bg-red-700 text-white border-red-700' : 'border-gray-300 text-gray-600 hover:border-red-300'
+                  className={`py-2 rounded-lg border text-sm font-medium capitalize transition-colors ${
+                    role === r
+                      ? 'bg-maple-red text-white border-maple-red'
+                      : 'border-hairline text-steel hover:border-maple-red/40 hover:text-charcoal'
                   }`}>
                   {r === 'renter' ? '🏠 Renter' : '🔑 Landlord'}
                 </button>
               ))}
             </div>
           </div>
+
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <label className="block text-sm font-medium text-charcoal mb-1">Email</label>
             <input type="email" required value={email} onChange={e => setEmail(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
+              className="w-full border border-hairline rounded-lg px-3 py-2.5 text-sm text-charcoal placeholder:text-stone focus:outline-none focus:ring-2 focus:ring-maple-red/20 focus:border-maple-red/40 transition"
               placeholder="you@example.com" />
           </div>
+
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+            <label className="block text-sm font-medium text-charcoal mb-1">Password</label>
             <input type="password" required minLength={6} value={password} onChange={e => setPassword(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
+              className="w-full border border-hairline rounded-lg px-3 py-2.5 text-sm text-charcoal placeholder:text-stone focus:outline-none focus:ring-2 focus:ring-maple-red/20 focus:border-maple-red/40 transition"
               placeholder="Min. 6 characters" />
           </div>
+
           <button type="submit" disabled={loading}
-            className="w-full bg-red-700 text-white py-2.5 rounded-lg font-semibold text-sm hover:bg-red-800 transition disabled:opacity-50">
+            className="w-full bg-maple-red text-white py-2.5 rounded-lg font-medium text-sm hover:bg-maple-dark transition-colors disabled:opacity-50">
             {loading ? 'Creating account...' : 'Create Free Account'}
           </button>
-          <p className="text-xs text-gray-400 text-center">By signing up, you agree to our community guidelines and terms.</p>
+
+          <p className="text-xs text-stone text-center">
+            By signing up, you agree to our community guidelines and terms.
+          </p>
         </form>
-        <p className="text-center text-sm text-gray-500 mt-4">
+
+        <p className="text-center text-sm text-steel mt-5">
           Already have an account?{' '}
-          <Link to="/login" className="text-red-700 font-medium hover:underline">Sign in</Link>
+          <Link to="/login" className="text-maple-red font-medium hover:text-maple-dark transition-colors">Sign in</Link>
         </p>
       </div>
     </div>

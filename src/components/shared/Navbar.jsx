@@ -20,9 +20,8 @@ export default function Navbar() {
         .then(({ data, error }) => {
           if (error) { console.error('Navbar: failed to fetch unread counts', error); return }
           if (!data) return
-          const total = data.reduce((sum, c) => {
-            return sum + (userId === c.renter_id ? (c.renter_unread || 0) : (c.landlord_unread || 0))
-          }, 0)
+          const total = data.reduce((sum, c) =>
+            sum + (userId === c.renter_id ? (c.renter_unread || 0) : (c.landlord_unread || 0)), 0)
           setUnreadCount(total)
         })
     }
@@ -31,7 +30,6 @@ export default function Navbar() {
     return () => clearInterval(interval)
   }, [userId])
 
-  // Close menu on route change
   useEffect(() => { setMenuOpen(false) }, [navigate])
 
   const handleSignOut = async () => {
@@ -40,46 +38,69 @@ export default function Navbar() {
     navigate('/')
   }
 
-  const navLink = "text-gray-600 hover:text-gray-900 text-sm font-medium"
-
   return (
-    <nav className="bg-white border-b border-gray-200 sticky top-0 z-50">
-      <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2 flex-shrink-0">
-          <span className="text-2xl">🍁</span>
-          <span className="text-xl font-bold text-red-700">MapleNest</span>
-          <span className="text-xs text-gray-400 hidden sm:block">PEI Housing</span>
+    <nav className="bg-white border-b border-hairline sticky top-0 z-50">
+      <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
+
+        {/* Logo */}
+        <Link to="/" className="flex items-center gap-2 flex-shrink-0 group">
+          <span className="text-xl leading-none">🍁</span>
+          <span className="text-[15px] font-semibold text-ink tracking-tight">
+            MapleNest
+          </span>
+          <span className="hidden sm:block text-xs text-stone font-normal">PEI</span>
         </Link>
 
         {/* Desktop nav */}
-        <div className="hidden md:flex items-center gap-4">
-          <Link to="/listings" className={navLink}>Browse Listings</Link>
-          <Link to="/analytics" className={navLink}>Analytics</Link>
+        <div className="hidden md:flex items-center gap-1">
+          <Link to="/listings"
+            className="px-3 py-1.5 text-sm text-steel hover:text-ink hover:bg-surface rounded-lg transition-colors">
+            Browse
+          </Link>
+          <Link to="/analytics"
+            className="px-3 py-1.5 text-sm text-steel hover:text-ink hover:bg-surface rounded-lg transition-colors">
+            Analytics
+          </Link>
           {user && (
-            <Link to="/messages" className={`relative ${navLink}`}>
+            <Link to="/messages"
+              className="relative px-3 py-1.5 text-sm text-steel hover:text-ink hover:bg-surface rounded-lg transition-colors">
               Messages
               {unreadCount > 0 && (
-                <span className="absolute -top-1.5 -right-2.5 bg-red-600 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-bold leading-none">
+                <span className="absolute top-1 right-1 bg-maple-red text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center font-bold leading-none">
                   {unreadCount > 9 ? '9+' : unreadCount}
                 </span>
               )}
             </Link>
           )}
+        </div>
+
+        {/* Right actions */}
+        <div className="hidden md:flex items-center gap-2">
           {user ? (
             <>
               <Link to="/create-listing"
-                className="bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-800 transition">
-                {isLandlord ? '+ Post Listing' : '+ Post Sublease'}
+                className="bg-maple-red text-white px-4 py-1.5 rounded-full text-sm font-medium hover:bg-maple-dark transition-colors">
+                {isLandlord ? '+ List' : '+ Sublease'}
               </Link>
-              <Link to="/profile" className="text-gray-600 hover:text-gray-900 text-sm">Profile</Link>
-              <button onClick={handleSignOut} className="text-gray-400 hover:text-gray-600 text-sm">Sign Out</button>
+              <Link to="/profile"
+                className="w-8 h-8 rounded-full bg-surface border border-hairline flex items-center justify-center text-sm text-charcoal hover:border-steel transition-colors"
+                title="Profile">
+                {user.email?.[0]?.toUpperCase() ?? '?'}
+              </Link>
+              <button onClick={handleSignOut}
+                className="px-3 py-1.5 text-xs text-stone hover:text-steel transition-colors">
+                Sign out
+              </button>
             </>
           ) : (
             <>
-              <Link to="/login" className={navLink}>Log In</Link>
+              <Link to="/login"
+                className="px-3 py-1.5 text-sm text-steel hover:text-ink transition-colors">
+                Log in
+              </Link>
               <Link to="/signup"
-                className="bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-800 transition">
-                Sign Up
+                className="bg-maple-red text-white px-4 py-1.5 rounded-full text-sm font-medium hover:bg-maple-dark transition-colors">
+                Sign up
               </Link>
             </>
           )}
@@ -87,66 +108,73 @@ export default function Navbar() {
 
         {/* Mobile hamburger */}
         <button
-          className="md:hidden relative flex items-center justify-center w-9 h-9 rounded-lg hover:bg-gray-100 transition"
+          className="md:hidden relative w-9 h-9 flex items-center justify-center rounded-lg hover:bg-surface transition-colors"
           onClick={() => setMenuOpen(!menuOpen)}
           aria-label="Toggle menu"
         >
-          <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+          <svg className="w-5 h-5 text-charcoal" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
             {menuOpen
               ? <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              : <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+              : <path strokeLinecap="round" strokeLinejoin="round" d="M3 6h18M3 12h18M3 18h18" />
             }
           </svg>
           {!menuOpen && unreadCount > 0 && (
-            <span className="absolute top-0.5 right-0.5 bg-red-600 w-2 h-2 rounded-full" />
+            <span className="absolute top-1.5 right-1.5 bg-maple-red w-2 h-2 rounded-full" />
           )}
         </button>
       </div>
 
-      {/* Mobile menu dropdown */}
+      {/* Mobile menu */}
       {menuOpen && (
-        <div className="md:hidden border-t border-gray-100 bg-white px-4 py-3 space-y-1">
+        <div className="md:hidden border-t border-hairline bg-white px-4 py-3 space-y-0.5">
           <Link to="/listings" onClick={() => setMenuOpen(false)}
-            className="block py-2.5 text-sm font-medium text-gray-700 hover:text-red-700">
+            className="flex items-center py-2.5 text-sm text-charcoal hover:text-maple-red transition-colors">
             Browse Listings
           </Link>
           <Link to="/analytics" onClick={() => setMenuOpen(false)}
-            className="block py-2.5 text-sm font-medium text-gray-700 hover:text-red-700">
+            className="flex items-center py-2.5 text-sm text-charcoal hover:text-maple-red transition-colors">
             Analytics
           </Link>
           {user && (
             <Link to="/messages" onClick={() => setMenuOpen(false)}
-              className="block py-2.5 text-sm font-medium text-gray-700 hover:text-red-700">
-              Messages{unreadCount > 0 && <span className="ml-1.5 bg-red-600 text-white text-xs rounded-full px-1.5 py-0.5 font-bold">{unreadCount}</span>}
+              className="flex items-center gap-2 py-2.5 text-sm text-charcoal hover:text-maple-red transition-colors">
+              Messages
+              {unreadCount > 0 && (
+                <span className="bg-maple-red text-white text-xs rounded-full px-1.5 py-0.5 font-bold leading-none">
+                  {unreadCount}
+                </span>
+              )}
             </Link>
           )}
-          {user ? (
-            <>
-              <Link to="/create-listing" onClick={() => setMenuOpen(false)}
-                className="block py-2.5 text-sm font-medium text-red-700 hover:text-red-800">
-                {isLandlord ? '+ Post Listing' : '+ Post Sublease'}
-              </Link>
-              <Link to="/profile" onClick={() => setMenuOpen(false)}
-                className="block py-2.5 text-sm font-medium text-gray-700 hover:text-red-700">
-                Profile
-              </Link>
-              <button onClick={handleSignOut}
-                className="block w-full text-left py-2.5 text-sm text-gray-400 hover:text-gray-600">
-                Sign Out
-              </button>
-            </>
-          ) : (
-            <>
-              <Link to="/login" onClick={() => setMenuOpen(false)}
-                className="block py-2.5 text-sm font-medium text-gray-700 hover:text-red-700">
-                Log In
-              </Link>
-              <Link to="/signup" onClick={() => setMenuOpen(false)}
-                className="block py-2.5 text-sm font-medium text-red-700 hover:text-red-800">
-                Sign Up
-              </Link>
-            </>
-          )}
+          <div className="pt-1 pb-0.5 border-t border-hairline-soft mt-1">
+            {user ? (
+              <>
+                <Link to="/create-listing" onClick={() => setMenuOpen(false)}
+                  className="flex items-center py-2.5 text-sm font-medium text-maple-red hover:text-maple-dark transition-colors">
+                  {isLandlord ? '+ Post Listing' : '+ Post Sublease'}
+                </Link>
+                <Link to="/profile" onClick={() => setMenuOpen(false)}
+                  className="flex items-center py-2.5 text-sm text-charcoal hover:text-maple-red transition-colors">
+                  Profile
+                </Link>
+                <button onClick={handleSignOut}
+                  className="flex items-center py-2.5 text-sm text-stone hover:text-steel transition-colors w-full">
+                  Sign out
+                </button>
+              </>
+            ) : (
+              <>
+                <Link to="/login" onClick={() => setMenuOpen(false)}
+                  className="flex items-center py-2.5 text-sm text-charcoal hover:text-maple-red transition-colors">
+                  Log in
+                </Link>
+                <Link to="/signup" onClick={() => setMenuOpen(false)}
+                  className="flex items-center py-2.5 text-sm font-medium text-maple-red hover:text-maple-dark transition-colors">
+                  Sign up free
+                </Link>
+              </>
+            )}
+          </div>
         </div>
       )}
     </nav>
