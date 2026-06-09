@@ -259,7 +259,7 @@ export default function UnitEditorModal({ listingId, basePrice, unit, onSaved, o
               className="flex-1 bg-red-700 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-red-800 transition disabled:opacity-50">
               {saving ? 'Saving...' : savedUnit ? 'Update unit' : 'Save unit'}
             </button>
-            <button onClick={onClose}
+            <button onClick={() => { if (savedUnit && form.room_rental) onSaved(savedUnit); onClose() }}
               className="flex-1 border border-gray-200 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-50 transition">
               {savedUnit && form.room_rental ? 'Done' : 'Cancel'}
             </button>

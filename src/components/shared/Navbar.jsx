@@ -12,18 +12,23 @@ export default function Navbar() {
 
   useEffect(() => {
     if (!userId) { setUnreadCount(0); return }
-    supabase
-      .from('conversations')
-      .select('renter_id, landlord_id, renter_unread, landlord_unread')
-      .or(`renter_id.eq.${userId},landlord_id.eq.${userId}`)
-      .then(({ data, error }) => {
-        if (error) { console.error('Navbar: failed to fetch unread counts', error); return }
-        if (!data) return
-        const total = data.reduce((sum, c) => {
-          return sum + (userId === c.renter_id ? (c.renter_unread || 0) : (c.landlord_unread || 0))
-        }, 0)
-        setUnreadCount(total)
-      })
+    const fetchUnread = () => {
+      supabase
+        .from('conversations')
+        .select('renter_id, landlord_id, renter_unread, landlord_unread')
+        .or(`renter_id.eq.${userId},landlord_id.eq.${userId}`)
+        .then(({ data, error }) => {
+          if (error) { console.error('Navbar: failed to fetch unread counts', error); return }
+          if (!data) return
+          const total = data.reduce((sum, c) => {
+            return sum + (userId === c.renter_id ? (c.renter_unread || 0) : (c.landlord_unread || 0))
+          }, 0)
+          setUnreadCount(total)
+        })
+    }
+    fetchUnread()
+    const interval = setInterval(fetchUnread, 30000)
+    return () => clearInterval(interval)
   }, [userId])
 
   // Close menu on route change

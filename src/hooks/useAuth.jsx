@@ -93,6 +93,7 @@ export function AuthProvider({ children }) {
       password,
       options: {
         data: { role: normalizeRole(role) },
+        emailRedirectTo: `${window.location.origin}/login`,
       },
     })
   }

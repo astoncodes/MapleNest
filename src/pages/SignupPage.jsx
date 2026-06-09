@@ -15,12 +15,17 @@ export default function SignupPage() {
     e.preventDefault()
     setError(null)
     setLoading(true)
-    const { error } = await signUp(email, password, role)
-    setLoading(false)
-    if (error) {
-      setError(error.message)
-    } else {
-      setSuccess(true)
+    try {
+      const { error } = await signUp(email, password, role)
+      if (error) {
+        setError(error.message)
+      } else {
+        setSuccess(true)
+      }
+    } catch (err) {
+      setError(err?.message || 'Something went wrong. Please try again.')
+    } finally {
+      setLoading(false)
     }
   }
 

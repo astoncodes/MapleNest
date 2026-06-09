@@ -14,12 +14,17 @@ export default function LoginPage() {
     e.preventDefault()
     setError(null)
     setLoading(true)
-    const { error } = await signIn(email, password)
-    setLoading(false)
-    if (error) {
-      setError(error.message)
-    } else {
-      navigate('/listings')
+    try {
+      const { error } = await signIn(email, password)
+      if (error) {
+        setError(error.message)
+      } else {
+        navigate('/listings')
+      }
+    } catch (err) {
+      setError(err?.message || 'Something went wrong. Please try again.')
+    } finally {
+      setLoading(false)
     }
   }
 

@@ -443,7 +443,7 @@ export default function ConversationPage() {
           renterId={conversation.renter_id}
           conversationId={conversation.id}
           onAssigned={(t) => {
-            setTenancy({ ...t, unit: { unit_name: '' }, room: null })
+            setTenancy(t)
             setShowAssignModal(false)
           }}
           onClose={() => setShowAssignModal(false)}

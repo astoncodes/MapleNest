@@ -90,7 +90,11 @@ export default function AssignTenantModal({ listingId, renterId, conversationId,
     }).eq('id', conversationId)
 
     setSaving(false)
-    onAssigned(tenancy)
+    onAssigned({
+      ...tenancy,
+      unit: { unit_name: selectedUnit?.unit_name || '' },
+      room: roomId ? { room_name: availableRooms.find(r => r.id === roomId)?.room_name || '' } : null,
+    })
   }
 
   // Filter to available units (whole-unit) or units with available rooms
