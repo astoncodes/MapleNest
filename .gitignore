@@ -9,8 +9,15 @@ dist/
 
 # Editor
 .vscode/
+.cursor/
 .idea/
 *.swp
+
+# Claude Code session data
+.claude/
+
+# Internal design docs
+DESIGN-*.md
 
 # OS
 .DS_Store

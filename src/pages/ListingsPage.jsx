@@ -32,26 +32,28 @@ function ListingCard({ listing, isSaved, onToggleSave }) {
   return (
     <Link to={`/listings/${listing.id}`} className="group block">
       {/* Image */}
-      <div className="aspect-[4/3] bg-surface rounded-xl overflow-hidden relative mb-3">
+      <div className="aspect-[4/3] bg-surface overflow-hidden relative mb-4">
         {image ? (
           <img
             src={image}
             alt={listing.title}
             loading="lazy"
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-700"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-stone text-4xl">🏠</div>
+          <div className="w-full h-full flex items-center justify-center bg-surface">
+            <span className="text-[10px] tracking-widest uppercase text-stone">No image</span>
+          </div>
         )}
 
-        {/* Type pill */}
-        <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-sm text-charcoal text-xs font-medium px-2.5 py-1 rounded-full">
+        {/* Type tag */}
+        <div className="absolute top-3 left-3 bg-canvas/90 backdrop-blur-sm text-[9px] tracking-widest uppercase text-charcoal px-2.5 py-1">
           {TYPE_LABELS[listing.property_type] || listing.property_type}
         </div>
 
-        {/* Utilities pill */}
+        {/* Utilities tag */}
         {listing.utilities_included && (
-          <div className="absolute bottom-3 left-3 bg-emerald-500 text-white text-xs font-medium px-2.5 py-1 rounded-full">
+          <div className="absolute bottom-3 left-3 bg-maple text-white text-[9px] tracking-widest uppercase px-2.5 py-1">
             Utilities incl.
           </div>
         )}
@@ -60,42 +62,42 @@ function ListingCard({ listing, isSaved, onToggleSave }) {
         {onToggleSave && (
           <button
             onClick={e => { e.preventDefault(); e.stopPropagation(); onToggleSave(listing.id) }}
-            className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full bg-white/90 backdrop-blur-sm hover:scale-110 transition-transform shadow-sm"
+            className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center bg-canvas/90 backdrop-blur-sm hover:bg-maple hover:text-white transition-colors"
             title={isSaved ? 'Unsave' : 'Save listing'}
             aria-label={isSaved ? 'Unsave listing' : 'Save listing'}
           >
-            <span className={isSaved ? 'text-maple-red' : 'text-stone'}>{isSaved ? '♥' : '♡'}</span>
+            <span className={`text-sm ${isSaved ? 'text-maple' : 'text-stone'}`}>{isSaved ? '♥' : '♡'}</span>
           </button>
         )}
       </div>
 
       {/* Content */}
-      <div className="px-0.5">
-        <div className="flex items-start justify-between gap-2 mb-0.5">
-          <h3 className="font-medium text-charcoal text-sm leading-snug line-clamp-1 group-hover:text-maple-red transition-colors">
+      <div>
+        <div className="flex items-start justify-between gap-2 mb-1">
+          <h3 className="font-serif font-normal text-lg text-ink leading-snug line-clamp-1 group-hover:text-maple transition-colors duration-200">
             {listing.title}
           </h3>
-          <span className="text-ink font-semibold text-sm whitespace-nowrap flex-shrink-0">
-            {pricePrefix}{formatPrice(displayPrice)}<span className="text-stone font-normal text-xs">/mo</span>
+          <span className="font-serif font-normal text-lg text-maple whitespace-nowrap flex-shrink-0">
+            {pricePrefix}{formatPrice(displayPrice)}<span className="text-stone text-xs">/mo</span>
           </span>
         </div>
 
-        <p className="text-xs text-steel mb-2">
+        <p className="text-[11px] tracking-wide uppercase text-stone mb-3">
           {listing.neighbourhood ? `${listing.neighbourhood}, ` : ''}{listing.city}
         </p>
 
-        <div className="flex items-center gap-3 text-xs text-stone">
+        <div className="flex items-center gap-3 text-xs text-steel border-t border-hairline pt-3">
           <span>{listing.bedrooms} bed</span>
-          <span>·</span>
+          <span className="text-hairline">·</span>
           <span>{listing.bathrooms} bath</span>
-          {listing.pet_friendly && <><span>·</span><span>Pets ok</span></>}
-          {listing.parking_available && <><span>·</span><span>Parking</span></>}
+          {listing.pet_friendly && <><span className="text-hairline">·</span><span>Pets ok</span></>}
+          {listing.parking_available && <><span className="text-hairline">·</span><span>Parking</span></>}
         </div>
 
         <UnitStrip units={units} />
 
         {listing.created_at && (
-          <p className="text-xs text-stone mt-1.5">{timeAgo(listing.created_at)}</p>
+          <p className="text-[10px] tracking-wide uppercase text-stone mt-2">{timeAgo(listing.created_at)}</p>
         )}
       </div>
     </Link>
@@ -197,55 +199,65 @@ export default function ListingsPage() {
 
   return (
     <div className="bg-canvas min-h-screen">
-      <div className="max-w-6xl mx-auto px-4 py-8">
 
-        {/* Header */}
-        <div className="mb-5">
-          <h1 className="text-xl font-semibold text-ink">PEI Rentals</h1>
-          <p className="text-sm text-steel mt-0.5">
-            {loading ? 'Loading...' : `${listings.length} listing${listings.length !== 1 ? 's' : ''} available`}
-          </p>
+      {/* Page header */}
+      <div className="border-b border-hairline px-6 md:px-10 py-10">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-[10px] tracking-widest uppercase text-maple mb-3">Prince Edward Island</div>
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+            <h1 className="font-serif font-light text-ink" style={{ fontSize: 'clamp(32px, 5vw, 52px)', lineHeight: 1.1 }}>
+              PEI Rentals
+            </h1>
+            <p className="text-[11px] tracking-widest uppercase text-stone">
+              {loading ? 'Loading...' : `${listings.length} listing${listings.length !== 1 ? 's' : ''} available`}
+            </p>
+          </div>
+
+          {/* Search */}
+          <form onSubmit={handleSearch}
+            className="flex mt-8 max-w-xl"
+            style={{ borderBottom: '1px solid #E8E0D5' }}
+          >
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search by title, neighbourhood, keyword..."
+              className="flex-1 bg-transparent py-3 text-sm text-charcoal placeholder:text-stone focus:outline-none font-light"
+            />
+            <button type="submit"
+              className="text-[11px] tracking-widest uppercase text-maple hover:text-maple-dark transition-colors py-3 pl-6 flex-shrink-0 flex items-center gap-1.5">
+              Search <span>→</span>
+            </button>
+          </form>
         </div>
+      </div>
 
-        {/* Search */}
-        <form onSubmit={handleSearch} className="flex gap-2 mb-6">
-          <input
-            type="text"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search by title, neighbourhood, keyword..."
-            className="flex-1 bg-white border border-hairline rounded-lg px-4 py-2.5 text-sm text-charcoal placeholder:text-stone focus:outline-none focus:ring-2 focus:ring-maple-red/20 focus:border-maple-red/40 transition"
-          />
-          <button type="submit"
-            className="bg-maple-red text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-maple-dark transition-colors">
-            Search
-          </button>
-        </form>
+      <div className="max-w-6xl mx-auto px-6 md:px-10 py-10">
+        <div className="flex gap-10">
 
-        <div className="flex gap-6">
           {/* Filter sidebar */}
-          <aside className="w-52 flex-shrink-0 hidden md:block">
-            <div className="bg-white rounded-xl border border-hairline shadow-card p-4 sticky top-20">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-medium text-charcoal">Filters</h3>
+          <aside className="w-48 flex-shrink-0 hidden md:block">
+            <div className="sticky top-24">
+              <div className="flex items-center justify-between mb-6">
+                <span className="text-[10px] tracking-widest uppercase text-stone">Filters</span>
                 {activeFilterCount > 0 && (
-                  <button onClick={resetFilters} className="text-xs text-maple-red hover:text-maple-dark transition-colors">
+                  <button onClick={resetFilters}
+                    className="text-[10px] tracking-widest uppercase text-maple hover:text-maple-dark transition-colors">
                     Reset ({activeFilterCount})
                   </button>
                 )}
               </div>
 
-              <div className="space-y-5">
+              <div className="space-y-7">
                 {/* City */}
                 <div>
-                  <label className="block text-[10px] font-semibold text-stone uppercase tracking-wider mb-2">City</label>
+                  <div className="text-[9px] tracking-widest uppercase text-stone mb-3 border-b border-hairline pb-2">City</div>
                   <div className="space-y-0.5">
                     {CITIES.map(c => (
                       <button key={c} onClick={() => updateFilter('city', c)}
-                        className={`w-full text-left px-2.5 py-1.5 rounded-lg text-sm transition-colors ${
-                          filters.city === c
-                            ? 'bg-maple-light text-maple-red font-medium'
-                            : 'text-steel hover:bg-surface hover:text-charcoal'
+                        className={`w-full text-left py-1.5 text-xs transition-colors ${
+                          filters.city === c ? 'text-maple font-medium' : 'text-steel hover:text-ink'
                         }`}>
                         {c}
                       </button>
@@ -255,14 +267,12 @@ export default function ListingsPage() {
 
                 {/* Type */}
                 <div>
-                  <label className="block text-[10px] font-semibold text-stone uppercase tracking-wider mb-2">Type</label>
+                  <div className="text-[9px] tracking-widest uppercase text-stone mb-3 border-b border-hairline pb-2">Type</div>
                   <div className="space-y-0.5">
                     {TYPES.map(t => (
                       <button key={t} onClick={() => updateFilter('type', t)}
-                        className={`w-full text-left px-2.5 py-1.5 rounded-lg text-sm transition-colors capitalize ${
-                          filters.type === t
-                            ? 'bg-maple-light text-maple-red font-medium'
-                            : 'text-steel hover:bg-surface hover:text-charcoal'
+                        className={`w-full text-left py-1.5 text-xs transition-colors capitalize ${
+                          filters.type === t ? 'text-maple font-medium' : 'text-steel hover:text-ink'
                         }`}>
                         {t === 'All' ? 'All Types' : TYPE_LABELS[t]}
                       </button>
@@ -272,27 +282,27 @@ export default function ListingsPage() {
 
                 {/* Price */}
                 <div>
-                  <label className="block text-[10px] font-semibold text-stone uppercase tracking-wider mb-2">Price (CAD/mo)</label>
+                  <div className="text-[9px] tracking-widest uppercase text-stone mb-3 border-b border-hairline pb-2">Price (CAD/mo)</div>
                   <div className="flex gap-2">
                     <input type="number" placeholder="Min" value={filters.minPrice}
                       onChange={e => updateFilter('minPrice', e.target.value)}
-                      className="w-full border border-hairline rounded-lg px-2.5 py-1.5 text-xs text-charcoal placeholder:text-stone focus:outline-none focus:ring-1 focus:ring-maple-red/30 transition" />
+                      className="w-full border-b border-hairline bg-transparent py-1.5 text-xs text-charcoal placeholder:text-stone focus:outline-none focus:border-maple transition" />
                     <input type="number" placeholder="Max" value={filters.maxPrice}
                       onChange={e => updateFilter('maxPrice', e.target.value)}
-                      className="w-full border border-hairline rounded-lg px-2.5 py-1.5 text-xs text-charcoal placeholder:text-stone focus:outline-none focus:ring-1 focus:ring-maple-red/30 transition" />
+                      className="w-full border-b border-hairline bg-transparent py-1.5 text-xs text-charcoal placeholder:text-stone focus:outline-none focus:border-maple transition" />
                   </div>
                 </div>
 
                 {/* Bedrooms */}
                 <div>
-                  <label className="block text-[10px] font-semibold text-stone uppercase tracking-wider mb-2">Bedrooms</label>
-                  <div className="flex gap-1 flex-wrap">
+                  <div className="text-[9px] tracking-widest uppercase text-stone mb-3 border-b border-hairline pb-2">Bedrooms</div>
+                  <div className="flex gap-1.5 flex-wrap">
                     {['Any', '1', '2', '3', '4'].map(b => (
                       <button key={b} onClick={() => updateFilter('bedrooms', b)}
-                        className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                        className={`px-2.5 py-1 text-xs transition-colors border ${
                           filters.bedrooms === b
-                            ? 'bg-maple-red text-white'
-                            : 'bg-surface text-steel hover:bg-hairline hover:text-charcoal'
+                            ? 'border-maple bg-maple text-white'
+                            : 'border-hairline text-steel hover:border-maple hover:text-maple'
                         }`}>
                         {b === 'Any' ? 'Any' : `${b}+`}
                       </button>
@@ -302,18 +312,18 @@ export default function ListingsPage() {
 
                 {/* Amenities */}
                 <div>
-                  <label className="block text-[10px] font-semibold text-stone uppercase tracking-wider mb-2">Amenities</label>
-                  <div className="space-y-2">
+                  <div className="text-[9px] tracking-widest uppercase text-stone mb-3 border-b border-hairline pb-2">Amenities</div>
+                  <div className="space-y-2.5">
                     {[
                       { key: 'petFriendly', label: 'Pet Friendly' },
                       { key: 'parking', label: 'Parking' },
                       { key: 'utilitiesIncluded', label: 'Utilities incl.' },
                     ].map(({ key, label }) => (
-                      <label key={key} className="flex items-center gap-2 cursor-pointer group">
+                      <label key={key} className="flex items-center gap-2.5 cursor-pointer group">
                         <input type="checkbox" checked={filters[key]}
                           onChange={e => updateFilter(key, e.target.checked)}
-                          className="rounded border-hairline text-maple-red focus:ring-maple-red/30" />
-                        <span className="text-sm text-steel group-hover:text-charcoal transition-colors">{label}</span>
+                          className="border-hairline text-maple focus:ring-maple/30 rounded-none" />
+                        <span className="text-xs text-steel group-hover:text-charcoal transition-colors">{label}</span>
                       </label>
                     ))}
                   </div>
@@ -325,32 +335,32 @@ export default function ListingsPage() {
           {/* Listings grid */}
           <div className="flex-1">
             {loading ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
                 {[...Array(6)].map((_, i) => (
                   <div key={i} className="animate-pulse">
-                    <div className="aspect-[4/3] bg-hairline rounded-xl mb-3" />
-                    <div className="space-y-2 px-0.5">
-                      <div className="h-4 bg-hairline rounded w-3/4" />
-                      <div className="h-3 bg-hairline rounded w-1/2" />
-                      <div className="h-3 bg-hairline rounded w-2/3" />
+                    <div className="aspect-[4/3] bg-hairline mb-4" />
+                    <div className="space-y-2">
+                      <div className="h-5 bg-hairline rounded w-3/4" />
+                      <div className="h-3 bg-hairline rounded w-1/3" />
+                      <div className="h-3 bg-hairline rounded w-1/2 mt-3" />
                     </div>
                   </div>
                 ))}
               </div>
             ) : listings.length === 0 ? (
-              <div className="text-center py-20 text-stone">
-                <div className="text-5xl mb-4">🏚</div>
-                <p className="font-medium text-charcoal">No listings found</p>
-                <p className="text-sm mt-1 text-steel">Try adjusting your filters or search terms</p>
+              <div className="py-24 text-center">
+                <div className="font-serif font-light text-4xl text-stone mb-4">∅</div>
+                <p className="font-serif font-light text-xl text-ink mb-2">No listings found</p>
+                <p className="text-sm text-steel">Try adjusting your filters or search terms</p>
                 {activeFilterCount > 0 && (
                   <button onClick={resetFilters}
-                    className="mt-5 text-maple-red text-sm font-medium hover:text-maple-dark transition-colors">
+                    className="mt-6 text-[11px] tracking-widest uppercase text-maple hover:text-maple-dark transition-colors">
                     Clear all filters
                   </button>
                 )}
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
                 {listings.map(listing => (
                   <ListingCard
                     key={listing.id}

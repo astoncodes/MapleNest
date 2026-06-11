@@ -4,62 +4,54 @@ import { supabase } from '../lib/supabase'
 import { mapSupabaseError } from '../lib/supabaseErrors'
 import { useAuth } from '../hooks/useAuth'
 
-const AVATAR_MAX_BYTES = 5 * 1024 * 1024 // 5 MB
+const AVATAR_MAX_BYTES = 5 * 1024 * 1024
 const AVATAR_MAX_LABEL = '5 MB'
 
-
-// ── Star rating display ──────────────────────────────────────────────────────
-function StarRating({ rating, max = 5, size = 'sm' }) {
-  const sz = size === 'lg' ? 'text-xl' : 'text-sm'
+function StarRating({ rating, max = 5 }) {
   return (
-    <span className={`inline-flex gap-0.5 ${sz}`}>
+    <span className="inline-flex gap-0.5">
       {Array.from({ length: max }).map((_, i) => (
-        <span key={i} className={i < Math.round(rating) ? 'text-amber-400' : 'text-gray-200'}>★</span>
+        <span key={i} className={i < Math.round(rating) ? 'text-maple' : 'text-hairline'} style={{ fontSize: '14px' }}>★</span>
       ))}
     </span>
   )
 }
 
-// ── Avatar ───────────────────────────────────────────────────────────────────
 function Avatar({ profile, size = 'md' }) {
-  const sizes = { sm: 'w-10 h-10 text-base', md: 'w-16 h-16 text-2xl', lg: 'w-24 h-24 text-4xl' }
+  const sizes = { sm: 'w-10 h-10 text-base', md: 'w-16 h-16 text-2xl', lg: 'w-20 h-20 text-3xl' }
   if (profile?.avatar_url) {
-    return <img src={profile.avatar_url} alt={profile.full_name}
-      className={`${sizes[size]} rounded-full object-cover ring-2 ring-white shadow`} />
+    return <img src={profile.avatar_url} alt={profile.full_name} className={`${sizes[size]} object-cover`} />
   }
   const initials = (profile?.full_name || profile?.email || '?').charAt(0).toUpperCase()
   return (
-    <div className={`${sizes[size]} rounded-full bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center font-bold text-white ring-2 ring-white shadow`}>
+    <div className={`${sizes[size]} bg-maple flex items-center justify-center font-normal text-white`}>
       {initials}
     </div>
   )
 }
 
-// ── Badge ────────────────────────────────────────────────────────────────────
 function VerifiedBadge({ label }) {
   return (
-    <span className="inline-flex items-center gap-1 bg-green-50 text-green-700 text-xs font-medium px-2 py-0.5 rounded-full border border-green-200">
-      <span>✓</span>{label}
+    <span className="inline-flex items-center gap-1 border border-hairline text-[9px] tracking-widest uppercase text-steel px-2 py-0.5">
+      <span className="text-maple">✓</span> {label}
     </span>
   )
 }
 
-// ── Section wrapper ──────────────────────────────────────────────────────────
 function Section({ title, children, action }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-4 border-b border-gray-50">
-        <h2 className="font-semibold text-gray-800">{title}</h2>
+    <div className="border border-hairline bg-canvas overflow-hidden">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-hairline">
+        <span className="text-[10px] tracking-widest uppercase text-stone">{title}</span>
         {action}
       </div>
-      <div className="p-5">{children}</div>
+      <div className="p-6">{children}</div>
     </div>
   )
 }
 
-// ── Main component ───────────────────────────────────────────────────────────
 export default function ProfilePage() {
-  const { id: paramId } = useParams()          // /profile/:id for public view
+  const { id: paramId } = useParams()
   const { user } = useAuth()
   const navigate = useNavigate()
 
@@ -71,29 +63,25 @@ export default function ProfilePage() {
   const [reviews, setReviews] = useState([])
   const [savedListings, setSavedListings] = useState([])
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState('overview')   // overview | listings | reviews | settings
+  const [tab, setTab] = useState('overview')
 
-  // Edit state
   const [editing, setEditing] = useState(false)
   const [editForm, setEditForm] = useState({})
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState(null)
   const [saveSuccess, setSaveSuccess] = useState(false)
 
-  // Password change state
   const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' })
   const [pwLoading, setPwLoading] = useState(false)
   const [pwError, setPwError] = useState(null)
   const [pwSuccess, setPwSuccess] = useState(false)
 
-  // Avatar upload
   const [avatarUploading, setAvatarUploading] = useState(false)
   const [avatarError, setAvatarError] = useState(null)
 
   const fetchAll = useCallback(async () => {
     setLoading(true)
     try {
-      // Lazy-expire any reviews past their window for this profile
       await supabase.rpc('expire_pending_reviews', { p_profile_id: viewingId })
 
       const [{ data: prof }, { data: listData }, { data: revData }, { data: savedData }] = await Promise.all([
@@ -106,7 +94,10 @@ export default function ProfilePage() {
           ? supabase.from('saved_listings').select('listing_id, listings(id, title, city, property_type, price, created_at, listing_images(url, is_primary))').eq('user_id', viewingId).order('created_at', { ascending: false })
           : Promise.resolve({ data: [] }),
       ])
-      if (prof) { setProfile(prof); setEditForm({ full_name: prof.full_name || '', phone: prof.phone || '', bio: prof.bio || '' }) }
+      if (prof) {
+        setProfile(prof)
+        setEditForm({ full_name: prof.full_name || '', phone: prof.phone || '', bio: prof.bio || '' })
+      }
       setListings(listData || [])
       setReviews(revData || [])
       setSavedListings((savedData || []).map(r => r.listings).filter(Boolean))
@@ -115,97 +106,43 @@ export default function ProfilePage() {
     }
   }, [isOwn, viewingId])
 
-  useEffect(() => {
-    if (!viewingId) return
-    fetchAll()
-  }, [fetchAll, viewingId])
+  useEffect(() => { if (viewingId) fetchAll() }, [fetchAll, viewingId])
 
-  // ── Save profile edits ───────────────────────────────────────────────────
   const handleSaveProfile = async () => {
     setSaving(true); setSaveError(null); setSaveSuccess(false)
     const { error } = await supabase.from('profiles').update({
-      full_name: editForm.full_name,
-      phone: editForm.phone,
-      bio: editForm.bio,
+      full_name: editForm.full_name, phone: editForm.phone, bio: editForm.bio,
     }).eq('id', user.id)
     setSaving(false)
-    if (error) { setSaveError(mapSupabaseError(error, 'Could not save your profile. Please try again.')) } else {
-      setSaveSuccess(true); setEditing(false)
-      setProfile(prev => ({ ...prev, ...editForm }))
-      setTimeout(() => setSaveSuccess(false), 3000)
-    }
+    if (error) { setSaveError(mapSupabaseError(error, 'Could not save your profile.')) }
+    else { setSaveSuccess(true); setEditing(false); setProfile(prev => ({ ...prev, ...editForm })); setTimeout(() => setSaveSuccess(false), 3000) }
   }
 
-  // ── Avatar upload ────────────────────────────────────────────────────────
   const handleAvatarUpload = async (e) => {
     const file = e.target.files[0]
     if (!file) return
-
-    // Client-side validation (mirrors uploadPhotos in CreateListingPage).
-    if (!file.type.startsWith('image/')) {
-      setAvatarError('Please choose an image file (JPG, PNG, WebP, or HEIC).')
-      e.target.value = ''
-      return
-    }
-    if (file.size > AVATAR_MAX_BYTES) {
-      setAvatarError(`That image is too large. Please keep it under ${AVATAR_MAX_LABEL}.`)
-      e.target.value = ''
-      return
-    }
-
-    setAvatarUploading(true)
-    setAvatarError(null)
-
+    if (!file.type.startsWith('image/')) { setAvatarError('Please choose an image file.'); e.target.value = ''; return }
+    if (file.size > AVATAR_MAX_BYTES) { setAvatarError(`Image must be under ${AVATAR_MAX_LABEL}.`); e.target.value = ''; return }
+    setAvatarUploading(true); setAvatarError(null)
     try {
       const ext = (file.name.split('.').pop() || 'jpg').toLowerCase()
-      // New path convention: {user_id}/{timestamp}.{ext}. Timestamp keeps
-      // the URL unique so browsers / CDNs don't serve a stale cached copy
-      // after the user changes their avatar.
-      const newName = `${Date.now()}.${ext}`
-      const newPath = `${user.id}/${newName}`
-
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(newPath, file, { cacheControl: '3600', upsert: false, contentType: file.type })
+      const newPath = `${user.id}/${Date.now()}.${ext}`
+      const { error: uploadError } = await supabase.storage.from('avatars').upload(newPath, file, { cacheControl: '3600', upsert: false, contentType: file.type })
       if (uploadError) throw uploadError
-
       const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(newPath)
-
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ avatar_url: urlData.publicUrl })
-        .eq('id', user.id)
-      if (updateError) {
-        // DB never recorded the new URL — pull the freshly uploaded blob back
-        // out so we don't leave orphans in the bucket.
-        await supabase.storage.from('avatars').remove([newPath])
-        throw updateError
-      }
-
-      // Remove any previous avatar objects this user had in the bucket so
-      // we don't accumulate one orphan per re-upload.
-      const { data: existingObjects } = await supabase.storage
-        .from('avatars')
-        .list(user.id)
+      const { error: updateError } = await supabase.from('profiles').update({ avatar_url: urlData.publicUrl }).eq('id', user.id)
+      if (updateError) { await supabase.storage.from('avatars').remove([newPath]); throw updateError }
+      const { data: existingObjects } = await supabase.storage.from('avatars').list(user.id)
       if (existingObjects?.length) {
-        const stalePaths = existingObjects
-          .map(obj => `${user.id}/${obj.name}`)
-          .filter(p => p !== newPath)
-        if (stalePaths.length) {
-          await supabase.storage.from('avatars').remove(stalePaths)
-        }
+        const stalePaths = existingObjects.map(obj => `${user.id}/${obj.name}`).filter(p => p !== newPath)
+        if (stalePaths.length) await supabase.storage.from('avatars').remove(stalePaths)
       }
-
       setProfile(prev => ({ ...prev, avatar_url: urlData.publicUrl }))
     } catch (err) {
-      setAvatarError(mapSupabaseError(err, 'Could not upload avatar. Please try again.'))
-    } finally {
-      setAvatarUploading(false)
-      e.target.value = ''
-    }
+      setAvatarError(mapSupabaseError(err, 'Could not upload avatar.'))
+    } finally { setAvatarUploading(false); e.target.value = '' }
   }
 
-  // ── Password change ──────────────────────────────────────────────────────
   const handlePasswordChange = async (e) => {
     e.preventDefault()
     setPwError(null); setPwSuccess(false)
@@ -214,41 +151,30 @@ export default function ProfilePage() {
     setPwLoading(true)
     const { error } = await supabase.auth.updateUser({ password: pwForm.next })
     setPwLoading(false)
-    if (error) { setPwError(mapSupabaseError(error, 'Could not update your password. Please try again.')) } else {
-      setPwSuccess(true); setPwForm({ current: '', next: '', confirm: '' })
-      setTimeout(() => setPwSuccess(false), 4000)
-    }
+    if (error) { setPwError(mapSupabaseError(error, 'Could not update password.')) }
+    else { setPwSuccess(true); setPwForm({ current: '', next: '', confirm: '' }); setTimeout(() => setPwSuccess(false), 4000) }
   }
 
   if (loading) return (
-    <div className="max-w-4xl mx-auto px-4 py-12">
-      <div className="animate-pulse space-y-4">
-        <div className="h-32 bg-gray-100 rounded-xl" />
-        <div className="h-64 bg-gray-100 rounded-xl" />
-      </div>
+    <div className="max-w-4xl mx-auto px-6 py-12 animate-pulse space-y-4">
+      <div className="h-36 bg-hairline" />
+      <div className="h-64 bg-hairline" />
     </div>
   )
 
   if (!profile) return (
-    <div className="max-w-4xl mx-auto px-4 py-12 text-center text-gray-500">
-      Profile not found. <Link to="/" className="text-red-700 hover:underline">Go home</Link>
+    <div className="max-w-4xl mx-auto px-6 py-16 text-center">
+      <p className="font-serif font-normal text-xl text-ink mb-3">Profile not found</p>
+      <Link to="/" className="text-[11px] tracking-widest uppercase text-maple hover:text-maple-dark">Go home →</Link>
     </div>
   )
 
   const avgRating = reviews.length ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length) : 0
   const isLandlord = profile.role === 'landlord'
 
-  // Compute top tags from visible reviews
   const tagCounts = {}
-  reviews.forEach(r => {
-    (r.tags || []).forEach(tag => {
-      tagCounts[tag] = (tagCounts[tag] || 0) + 1
-    })
-  })
-  const topTags = Object.entries(tagCounts)
-    .filter(([, count]) => count >= 2)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 3)
+  reviews.forEach(r => { (r.tags || []).forEach(tag => { tagCounts[tag] = (tagCounts[tag] || 0) + 1 }) })
+  const topTags = Object.entries(tagCounts).filter(([, c]) => c >= 2).sort((a, b) => b[1] - a[1]).slice(0, 3)
 
   const TABS = [
     { key: 'overview', label: 'Overview' },
@@ -256,329 +182,344 @@ export default function ProfilePage() {
     { key: 'reviews', label: `Reviews (${reviews.length})` },
     ...(isOwn ? [
       { key: 'saved', label: `Saved (${savedListings.length})` },
-      { key: 'settings', label: '⚙️ Settings' },
+      { key: 'settings', label: 'Settings' },
     ] : []),
   ].filter(t => t.show !== false)
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
+    <div className="bg-canvas min-h-screen">
 
-      {/* ── Profile hero ── */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-        {/* Banner */}
-        <div className="h-20 bg-gradient-to-r from-red-700 to-red-900" />
+      {/* Profile hero */}
+      <div className="border-b border-hairline">
+        {/* Warm banner */}
+        <div className="h-16 bg-surface" />
 
-        <div className="px-6 pb-6">
-          <div className="flex items-end justify-between -mt-10 mb-4 flex-wrap gap-3">
+        <div className="max-w-4xl mx-auto px-6 pb-8">
+          <div className="flex items-end justify-between -mt-10 mb-5 flex-wrap gap-4">
             {/* Avatar + upload */}
             <div className="relative">
               <Avatar profile={profile} size="lg" />
               {isOwn && (
-                <label className="absolute bottom-0 right-0 bg-white rounded-full p-1 shadow cursor-pointer border border-gray-200 hover:bg-gray-50">
+                <label className="absolute bottom-0 right-0 bg-canvas border border-hairline w-6 h-6 flex items-center justify-center cursor-pointer hover:bg-surface transition-colors">
                   <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
-                  <span className="text-xs">{avatarUploading ? '⏳' : '📷'}</span>
+                  <span className="text-[10px]">{avatarUploading ? '…' : '+'}</span>
                 </label>
               )}
             </div>
-
             {isOwn && !editing && (
               <button onClick={() => setEditing(true)}
-                className="px-4 py-2 text-sm font-medium border border-gray-200 rounded-lg hover:bg-gray-50 transition">
+                className="text-[11px] tracking-widest uppercase border border-hairline px-4 py-2 text-steel hover:text-ink hover:border-ink transition-colors">
                 Edit Profile
               </button>
             )}
           </div>
 
-          {/* Name & role */}
           {editing ? (
-            <div className="space-y-3 max-w-md">
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Full Name</label>
-                <input value={editForm.full_name} onChange={e => setEditForm(p => ({ ...p, full_name: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
-                  maxLength={80} />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Phone</label>
-                <input value={editForm.phone} onChange={e => setEditForm(p => ({ ...p, phone: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
-                  placeholder="+1 (902) 555-0100" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Bio</label>
-                <textarea value={editForm.bio} rows={3} onChange={e => setEditForm(p => ({ ...p, bio: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
-                  placeholder="Tell renters or landlords a bit about yourself..."
-                  maxLength={500} />
-              </div>
-              {saveError && <p className="text-xs text-red-600">{saveError}</p>}
-              <div className="flex gap-2">
+            <div className="space-y-5 max-w-md">
+              {[
+                { key: 'full_name', label: 'Full Name', type: 'input', max: 80 },
+                { key: 'phone', label: 'Phone', type: 'input', placeholder: '+1 (902) 555-0100' },
+                { key: 'bio', label: 'Bio', type: 'textarea', max: 500, placeholder: 'Tell renters or landlords about yourself...' },
+              ].map(f => (
+                <div key={f.key}>
+                  <label className="block text-[10px] tracking-widest uppercase text-stone mb-2">{f.label}</label>
+                  {f.type === 'textarea' ? (
+                    <textarea value={editForm[f.key]} rows={3}
+                      onChange={e => setEditForm(p => ({ ...p, [f.key]: e.target.value }))}
+                      className="w-full bg-transparent border-b border-hairline py-2 text-sm text-charcoal placeholder:text-stone focus:outline-none focus:border-maple transition-colors resize-none font-light"
+                      placeholder={f.placeholder} maxLength={f.max} />
+                  ) : (
+                    <input value={editForm[f.key]}
+                      onChange={e => setEditForm(p => ({ ...p, [f.key]: e.target.value }))}
+                      className="w-full bg-transparent border-b border-hairline py-2 text-sm text-charcoal placeholder:text-stone focus:outline-none focus:border-maple transition-colors font-light"
+                      placeholder={f.placeholder} maxLength={f.max} />
+                  )}
+                </div>
+              ))}
+              {saveError && <p className="text-xs text-maple">{saveError}</p>}
+              <div className="flex gap-3 pt-1">
                 <button onClick={handleSaveProfile} disabled={saving}
-                  className="px-4 py-2 bg-red-700 text-white text-sm font-medium rounded-lg hover:bg-red-800 transition disabled:opacity-50">
+                  className="text-[11px] tracking-widest uppercase bg-ink text-canvas px-5 py-2.5 hover:bg-maple transition-colors disabled:opacity-40">
                   {saving ? 'Saving...' : 'Save Changes'}
                 </button>
                 <button onClick={() => setEditing(false)}
-                  className="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">
+                  className="text-[11px] tracking-widest uppercase border border-hairline px-5 py-2.5 text-steel hover:text-ink transition-colors">
                   Cancel
                 </button>
               </div>
             </div>
           ) : (
             <>
-              <h1 className="text-xl font-bold text-gray-900">{profile.full_name || 'Anonymous'}</h1>
-              <p className="text-sm text-gray-500">{profile.email}</p>
-              <div className="flex items-center gap-2 mt-2 flex-wrap">
-                <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${isLandlord ? 'bg-red-50 text-red-700' : 'bg-blue-50 text-blue-700'}`}>
-                  {isLandlord ? '🏠 Landlord' : '🔍 Renter'}
+              <h1 className="font-serif font-normal text-2xl text-ink mb-1">
+                {profile.full_name || 'Anonymous'}
+              </h1>
+              <p className="text-sm text-stone mb-3">{profile.email}</p>
+              <div className="flex items-center gap-2 flex-wrap mb-3">
+                <span className={`text-[9px] tracking-widest uppercase border px-2.5 py-1 ${isLandlord ? 'border-maple text-maple' : 'border-hairline text-steel'}`}>
+                  {isLandlord ? 'Landlord' : 'Renter'}
                 </span>
                 {profile.email_verified && <VerifiedBadge label="Email" />}
                 {profile.phone_verified && <VerifiedBadge label="Phone" />}
                 {profile.id_verified && <VerifiedBadge label="ID" />}
               </div>
-              {profile.bio && <p className="text-sm text-gray-600 mt-3 max-w-xl leading-relaxed">{profile.bio}</p>}
+              {profile.bio && (
+                <p className="text-sm text-steel leading-relaxed max-w-xl mb-3">{profile.bio}</p>
+              )}
               {reviews.length > 0 && (
-                <div className="flex items-center gap-2 mt-3">
-                  <StarRating rating={avgRating} size="lg" />
-                  <span className="text-sm font-semibold text-gray-800">{avgRating.toFixed(1)}</span>
-                  <span className="text-sm text-gray-400">({reviews.length} review{reviews.length !== 1 ? 's' : ''})</span>
+                <div className="flex items-center gap-2 mb-2">
+                  <StarRating rating={avgRating} />
+                  <span className="font-normal text-sm text-ink">{avgRating.toFixed(1)}</span>
+                  <span className="text-xs text-stone">({reviews.length} review{reviews.length !== 1 ? 's' : ''})</span>
                 </div>
               )}
               {topTags.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                <div className="flex flex-wrap gap-1.5">
                   {topTags.map(([tag, count]) => (
-                    <span key={tag} className="inline-flex items-center gap-1 bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-full">
-                      {tag} <span className="text-gray-400">({count})</span>
+                    <span key={tag} className="border border-hairline text-[9px] tracking-widest uppercase text-steel px-2 py-0.5">
+                      {tag} <span className="text-stone">({count})</span>
                     </span>
                   ))}
                 </div>
               )}
             </>
           )}
-
-          {saveSuccess && <p className="text-xs text-green-600 mt-2">✓ Profile updated successfully</p>}
-          {avatarError && <p className="text-xs text-red-600 mt-2">{avatarError}</p>}
+          {saveSuccess && <p className="text-xs text-maple mt-3">✓ Profile updated</p>}
+          {avatarError && <p className="text-xs text-maple mt-3">{avatarError}</p>}
         </div>
       </div>
 
-      {/* ── Tabs ── */}
-      <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-full sm:w-fit overflow-x-auto">
-        {TABS.map(t => (
-          <button key={t.key} onClick={() => setTab(t.key)}
-            className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition whitespace-nowrap flex-shrink-0 ${tab === t.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {/* ── Overview tab ── */}
-      {tab === 'overview' && (
-        <div className="grid sm:grid-cols-3 gap-4">
-          {[
-            { label: 'Member since', value: new Date(profile.created_at).toLocaleDateString('en-CA', { month: 'short', year: 'numeric' }) },
-            { label: 'Avg rating', value: reviews.length ? `${avgRating.toFixed(1)} / 5` : 'No reviews yet' },
-            { label: isLandlord ? 'Active listings' : 'Role', value: isLandlord ? listings.length : 'Renter' },
-          ].map(s => (
-            <div key={s.label} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 text-center">
-              <div className="text-2xl font-bold text-gray-900">{s.value}</div>
-              <div className="text-xs text-gray-400 mt-1">{s.label}</div>
-            </div>
+      {/* Tabs */}
+      <div className="border-b border-hairline">
+        <div className="max-w-4xl mx-auto px-6 flex gap-0 overflow-x-auto">
+          {TABS.map(t => (
+            <button key={t.key} onClick={() => setTab(t.key)}
+              className={`px-5 py-3.5 text-[11px] tracking-widest uppercase whitespace-nowrap flex-shrink-0 border-b-2 transition-colors ${
+                tab === t.key
+                  ? 'border-maple text-ink font-medium'
+                  : 'border-transparent text-stone hover:text-steel'
+              }`}>
+              {t.label}
+            </button>
           ))}
         </div>
-      )}
+      </div>
 
-      {/* ── Listings tab ── */}
-      {tab === 'listings' && (
-        <Section title="Active Listings"
-          action={isOwn && <Link to="/create-listing" className="text-xs font-medium text-red-700 border border-red-200 px-3 py-1.5 rounded-lg hover:bg-red-50">+ New Listing</Link>}>
-          {listings.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-6">No active listings yet.</p>
-          ) : (
-            <div className="space-y-3">
-              {listings.map(l => {
-                const img = l.listing_images?.find(i => i.is_primary) || l.listing_images?.[0]
-                return (
-                  <Link key={l.id} to={`/listings/${l.id}`}
-                    className="flex items-center gap-3 p-3 rounded-lg border border-gray-100 hover:bg-gray-50 transition">
-                    <div className="w-14 h-14 rounded-lg bg-gray-100 overflow-hidden flex-shrink-0">
-                      {img ? <img src={img.url} alt="" loading="lazy" className="w-full h-full object-cover" /> :
-                        <div className="w-full h-full flex items-center justify-center text-gray-300 text-xl">🏠</div>}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm text-gray-800 truncate">{l.title}</p>
-                      <p className="text-xs text-gray-500">{l.city} · {l.property_type} · ${l.price}/mo</p>
-                    </div>
-                    <span className="text-xs px-2 py-1 bg-green-50 text-green-700 rounded-full">{l.status}</span>
-                  </Link>
-                )
-              })}
-            </div>
-          )}
-        </Section>
-      )}
+      {/* Tab content */}
+      <div className="max-w-4xl mx-auto px-6 py-8 space-y-5">
 
-      {/* ── Reviews tab ── */}
-      {tab === 'reviews' && (
-        <div className="space-y-4">
+        {/* Overview */}
+        {tab === 'overview' && (
+          <div className="grid sm:grid-cols-3 gap-px bg-hairline border border-hairline">
+            {[
+              { label: 'Member since', value: new Date(profile.created_at).toLocaleDateString('en-CA', { month: 'short', year: 'numeric' }) },
+              { label: 'Avg rating', value: reviews.length ? `${avgRating.toFixed(1)} / 5` : '—' },
+              { label: isLandlord ? 'Active listings' : 'Role', value: isLandlord ? listings.length : 'Renter' },
+            ].map(s => (
+              <div key={s.label} className="bg-canvas p-6 text-center">
+                <div className="font-serif font-normal text-3xl text-maple">{s.value}</div>
+                <div className="text-[10px] tracking-widest uppercase text-stone mt-2">{s.label}</div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Listings */}
+        {tab === 'listings' && (
+          <Section title={`Active Listings (${listings.length})`}
+            action={isOwn && (
+              <Link to="/create-listing"
+                className="text-[10px] tracking-widest uppercase border border-hairline text-steel hover:text-maple hover:border-maple px-3 py-1.5 transition-colors">
+                + New
+              </Link>
+            )}>
+            {listings.length === 0 ? (
+              <p className="text-sm text-stone text-center py-6">No active listings yet.</p>
+            ) : (
+              <div className="space-y-px border border-hairline">
+                {listings.map(l => {
+                  const img = l.listing_images?.find(i => i.is_primary) || l.listing_images?.[0]
+                  return (
+                    <Link key={l.id} to={`/listings/${l.id}`}
+                      className="flex items-center gap-4 p-4 bg-canvas hover:bg-surface transition-colors">
+                      <div className="w-12 h-12 bg-surface overflow-hidden flex-shrink-0">
+                        {img ? <img src={img.url} alt="" loading="lazy" className="w-full h-full object-cover" /> :
+                          <div className="w-full h-full flex items-center justify-center text-stone text-xs">—</div>}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-normal text-sm text-ink truncate">{l.title}</p>
+                        <p className="text-[10px] tracking-wide uppercase text-stone mt-0.5">
+                          {l.city} · {l.property_type} · ${l.price}/mo
+                        </p>
+                      </div>
+                      <span className="text-[9px] tracking-widest uppercase border border-hairline text-maple px-2 py-1">
+                        {l.status}
+                      </span>
+                    </Link>
+                  )
+                })}
+              </div>
+            )}
+          </Section>
+        )}
+
+        {/* Reviews */}
+        {tab === 'reviews' && (
           <Section title={`Reviews (${reviews.length})`}>
             {reviews.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-6">No reviews yet.</p>
+              <p className="text-sm text-stone text-center py-6">No reviews yet.</p>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-6">
                 {reviews.map(r => (
-                  <div key={r.id} className="pb-4 border-b border-gray-50 last:border-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-500">
+                  <div key={r.id} className="border-b border-hairline pb-6 last:border-0 last:pb-0">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-7 h-7 bg-maple flex items-center justify-center text-xs font-normal text-white">
                         {(r.reviewer?.full_name || r.reviewer?.email || '?').charAt(0).toUpperCase()}
                       </div>
-                      <span className="text-sm font-medium text-gray-700">{r.reviewer?.full_name || 'Anonymous'}</span>
+                      <span className="text-sm font-normal text-ink">{r.reviewer?.full_name || 'Anonymous'}</span>
                       <StarRating rating={r.rating} />
-                      <span className="text-xs text-gray-400 ml-auto">{new Date(r.created_at).toLocaleDateString('en-CA')}</span>
+                      <span className="text-[10px] tracking-wide uppercase text-stone ml-auto">
+                        {new Date(r.created_at).toLocaleDateString('en-CA')}
+                      </span>
                     </div>
                     {r.tenancy?.listing?.title && (
-                      <p className="text-xs text-gray-400 ml-9 mb-1">
+                      <p className="text-[10px] tracking-wide uppercase text-stone ml-10 mb-2">
                         {r.tenancy.listing.title}
                         {r.tenancy.unit?.unit_name ? ` · ${r.tenancy.unit.unit_name}` : ''}
                       </p>
                     )}
                     {r.tags?.length > 0 && (
-                      <div className="flex flex-wrap gap-1 ml-9 mb-1">
+                      <div className="flex flex-wrap gap-1.5 ml-10 mb-2">
                         {r.tags.map(tag => (
-                          <span key={tag} className="bg-gray-100 text-gray-500 text-xs px-2 py-0.5 rounded-full">{tag}</span>
+                          <span key={tag} className="border border-hairline text-[9px] tracking-widest uppercase text-steel px-2 py-0.5">{tag}</span>
                         ))}
                       </div>
                     )}
-                    {r.comment && <p className="text-sm text-gray-600 ml-9">{r.comment}</p>}
+                    {r.comment && <p className="text-sm text-steel leading-relaxed ml-10">{r.comment}</p>}
                   </div>
                 ))}
               </div>
             )}
           </Section>
+        )}
 
-        </div>
-      )}
-
-      {/* ── Saved tab (own profile only) ── */}
-      {tab === 'saved' && isOwn && (
-        <Section title="Saved Listings">
-          {savedListings.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-6">
-              No saved listings yet. Browse listings and click ♡ to save them.
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {savedListings.map(l => {
-                const img = l.listing_images?.find(i => i.is_primary) || l.listing_images?.[0]
-                return (
-                  <Link key={l.id} to={`/listings/${l.id}`}
-                    className="flex items-center gap-3 p-3 rounded-lg border border-gray-100 hover:bg-gray-50 transition">
-                    <div className="w-14 h-14 rounded-lg bg-gray-100 overflow-hidden flex-shrink-0">
-                      {img ? <img src={img.url} alt={l.title} loading="lazy" className="w-full h-full object-cover" /> :
-                        <div className="w-full h-full flex items-center justify-center text-gray-300 text-xl">🏠</div>}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm text-gray-800 truncate">{l.title}</p>
-                      <p className="text-xs text-gray-500">{l.city} · {l.property_type?.charAt(0).toUpperCase() + l.property_type?.slice(1)} · ${Number(l.price).toLocaleString()}/mo</p>
-                    </div>
-                    <span className="text-red-500 text-lg">♥</span>
-                  </Link>
-                )
-              })}
-            </div>
-          )}
-        </Section>
-      )}
-
-      {/* ── Settings tab (own profile only) ── */}
-      {tab === 'settings' && isOwn && (
-        <div className="space-y-4">
-
-          {/* Account info */}
-          <Section title="Account Information">
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between py-2 border-b border-gray-50">
-                <span className="text-gray-500">Email</span>
-                <span className="font-medium text-gray-800">{profile.email}</span>
+        {/* Saved */}
+        {tab === 'saved' && isOwn && (
+          <Section title={`Saved Listings (${savedListings.length})`}>
+            {savedListings.length === 0 ? (
+              <p className="text-sm text-stone text-center py-6">
+                No saved listings yet. Click ♡ on any listing to save it.
+              </p>
+            ) : (
+              <div className="space-y-px border border-hairline">
+                {savedListings.map(l => {
+                  const img = l.listing_images?.find(i => i.is_primary) || l.listing_images?.[0]
+                  return (
+                    <Link key={l.id} to={`/listings/${l.id}`}
+                      className="flex items-center gap-4 p-4 bg-canvas hover:bg-surface transition-colors">
+                      <div className="w-12 h-12 bg-surface overflow-hidden flex-shrink-0">
+                        {img ? <img src={img.url} alt={l.title} loading="lazy" className="w-full h-full object-cover" /> :
+                          <div className="w-full h-full flex items-center justify-center text-stone text-xs">—</div>}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-normal text-sm text-ink truncate">{l.title}</p>
+                        <p className="text-[10px] tracking-wide uppercase text-stone mt-0.5">
+                          {l.city} · {l.property_type} · ${Number(l.price).toLocaleString()}/mo
+                        </p>
+                      </div>
+                      <span className="text-maple text-base">♥</span>
+                    </Link>
+                  )
+                })}
               </div>
-              <div className="flex justify-between py-2 border-b border-gray-50">
-                <span className="text-gray-500">Role</span>
-                <span className="font-medium text-gray-800 capitalize">{profile.role}</span>
-              </div>
-              <div className="flex justify-between py-2 border-b border-gray-50">
-                <span className="text-gray-500">Phone</span>
-                <span className="font-medium text-gray-800">{profile.phone || '—'}</span>
-              </div>
-              <div className="flex justify-between py-2">
-                <span className="text-gray-500">Joined</span>
-                <span className="font-medium text-gray-800">{new Date(profile.created_at).toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
-              </div>
-            </div>
+            )}
           </Section>
+        )}
 
-          {/* Change password */}
-          <Section title="Change Password">
-            <form onSubmit={handlePasswordChange} className="space-y-4 max-w-sm">
-              {[
-                { key: 'next', label: 'New Password', placeholder: 'Min. 6 characters' },
-                { key: 'confirm', label: 'Confirm New Password', placeholder: 'Repeat new password' },
-              ].map(f => (
-                <div key={f.key}>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">{f.label}</label>
-                  <input type="password" value={pwForm[f.key]} placeholder={f.placeholder}
-                    onChange={e => setPwForm(p => ({ ...p, [f.key]: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-300" />
-                  {f.key === 'confirm' && pwForm.confirm && pwForm.next !== pwForm.confirm && (
-                    <p className="text-xs text-red-500 mt-1">Passwords don&apos;t match</p>
-                  )}
-                  {f.key === 'confirm' && pwForm.confirm && pwForm.next === pwForm.confirm && pwForm.next.length >= 6 && (
-                    <p className="text-xs text-green-600 mt-1">✓ Passwords match</p>
-                  )}
-                </div>
-              ))}
-              {pwError && <p className="text-xs text-red-600">{pwError}</p>}
-              {pwSuccess && <p className="text-xs text-green-600">✓ Password updated successfully!</p>}
-              <button type="submit" disabled={pwLoading || pwForm.next !== pwForm.confirm || pwForm.next.length < 6}
-                className="px-5 py-2.5 bg-red-700 text-white text-sm font-semibold rounded-lg hover:bg-red-800 transition disabled:opacity-50">
-                {pwLoading ? 'Updating...' : 'Update Password'}
-              </button>
-            </form>
-          </Section>
+        {/* Settings */}
+        {tab === 'settings' && isOwn && (
+          <div className="space-y-5">
 
-          {/* Verification status */}
-          <Section title="Verification">
-            <div className="space-y-3">
-              {[
-                { key: 'email_verified', label: 'Email Verified', desc: 'Your email address has been confirmed' },
-                { key: 'phone_verified', label: 'Phone Verified', desc: 'Add phone verification for extra trust' },
-                { key: 'id_verified', label: 'ID Verified', desc: 'Government ID verification (coming soon)' },
-              ].map(v => (
-                <div key={v.key} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
-                  <div>
-                    <p className="text-sm font-medium text-gray-800">{v.label}</p>
-                    <p className="text-xs text-gray-400">{v.desc}</p>
+            <Section title="Account Information">
+              <div className="space-y-0 divide-y divide-hairline">
+                {[
+                  { label: 'Email', value: profile.email },
+                  { label: 'Role', value: profile.role?.charAt(0).toUpperCase() + profile.role?.slice(1) },
+                  { label: 'Phone', value: profile.phone || '—' },
+                  { label: 'Joined', value: new Date(profile.created_at).toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric' }) },
+                ].map(s => (
+                  <div key={s.label} className="flex justify-between py-3">
+                    <span className="text-[10px] tracking-widest uppercase text-stone">{s.label}</span>
+                    <span className="text-sm font-normal text-charcoal">{s.value}</span>
                   </div>
-                  <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${profile[v.key] ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
-                    {profile[v.key] ? '✓ Verified' : 'Unverified'}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </Section>
-
-          {/* Danger zone */}
-          <Section title="Account">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-800">Sign out</p>
-                <p className="text-xs text-gray-400">Sign out of your MapleNest account</p>
+                ))}
               </div>
-              <button onClick={async () => { await supabase.auth.signOut(); navigate('/') }}
-                className="px-4 py-2 text-sm font-medium border border-gray-200 rounded-lg hover:bg-gray-50 transition">
-                Sign Out
-              </button>
-            </div>
-          </Section>
-        </div>
-      )}
+            </Section>
+
+            <Section title="Change Password">
+              <form onSubmit={handlePasswordChange} className="space-y-5 max-w-sm">
+                {[
+                  { key: 'next', label: 'New Password', placeholder: 'Min. 6 characters' },
+                  { key: 'confirm', label: 'Confirm New Password', placeholder: 'Repeat new password' },
+                ].map(f => (
+                  <div key={f.key}>
+                    <label className="block text-[10px] tracking-widest uppercase text-stone mb-2">{f.label}</label>
+                    <input type="password" value={pwForm[f.key]} placeholder={f.placeholder}
+                      onChange={e => setPwForm(p => ({ ...p, [f.key]: e.target.value }))}
+                      className="w-full bg-transparent border-b border-hairline py-2 text-sm text-charcoal placeholder:text-stone focus:outline-none focus:border-maple transition-colors font-light" />
+                    {f.key === 'confirm' && pwForm.confirm && pwForm.next !== pwForm.confirm && (
+                      <p className="text-xs text-maple mt-1">Passwords don&apos;t match</p>
+                    )}
+                    {f.key === 'confirm' && pwForm.confirm && pwForm.next === pwForm.confirm && pwForm.next.length >= 6 && (
+                      <p className="text-xs text-steel mt-1">✓ Passwords match</p>
+                    )}
+                  </div>
+                ))}
+                {pwError && <p className="text-xs text-maple">{pwError}</p>}
+                {pwSuccess && <p className="text-xs text-steel">✓ Password updated successfully</p>}
+                <button type="submit"
+                  disabled={pwLoading || pwForm.next !== pwForm.confirm || pwForm.next.length < 6}
+                  className="text-[11px] tracking-widest uppercase bg-ink text-canvas px-6 py-2.5 hover:bg-maple transition-colors disabled:opacity-40">
+                  {pwLoading ? 'Updating...' : 'Update Password'}
+                </button>
+              </form>
+            </Section>
+
+            <Section title="Verification">
+              <div className="space-y-0 divide-y divide-hairline">
+                {[
+                  { key: 'email_verified', label: 'Email Verified', desc: 'Your email address has been confirmed' },
+                  { key: 'phone_verified', label: 'Phone Verified', desc: 'Add phone verification for extra trust' },
+                  { key: 'id_verified', label: 'ID Verified', desc: 'Government ID verification (coming soon)' },
+                ].map(v => (
+                  <div key={v.key} className="flex items-center justify-between py-4">
+                    <div>
+                      <p className="text-sm font-normal text-ink">{v.label}</p>
+                      <p className="text-xs text-stone">{v.desc}</p>
+                    </div>
+                    <span className={`text-[9px] tracking-widest uppercase border px-2.5 py-1 ${profile[v.key] ? 'border-maple text-maple' : 'border-hairline text-stone'}`}>
+                      {profile[v.key] ? '✓ Verified' : 'Unverified'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </Section>
+
+            <Section title="Account">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-normal text-ink">Sign out</p>
+                  <p className="text-xs text-stone">Sign out of your MapleNest account</p>
+                </div>
+                <button onClick={async () => { await supabase.auth.signOut(); navigate('/') }}
+                  className="text-[11px] tracking-widest uppercase border border-hairline px-4 py-2 text-steel hover:text-ink hover:border-ink transition-colors">
+                  Sign Out
+                </button>
+              </div>
+            </Section>
+
+          </div>
+        )}
+      </div>
     </div>
   )
 }

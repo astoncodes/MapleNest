@@ -19,10 +19,10 @@ const timeAgo = (dateStr) => {
 
 function Avatar({ profile }) {
   if (profile?.avatar_url) {
-    return <img src={profile.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
+    return <img src={profile.avatar_url} alt="" className="w-10 h-10 object-cover flex-shrink-0" />
   }
   return (
-    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center font-bold text-white flex-shrink-0 text-sm">
+    <div className="w-10 h-10 bg-maple flex items-center justify-center font-normal text-white flex-shrink-0 text-sm">
       {(profile?.full_name || profile?.email || '?').charAt(0).toUpperCase()}
     </div>
   )
@@ -33,7 +33,7 @@ export default function MessagesInboxPage() {
   const userId = user?.id
   const [conversations, setConversations] = useState([])
   const [loading, setLoading] = useState(true)
-  const [pendingReviews, setPendingReviews] = useState({}) // { conversationId: { tenancy, hasSubmitted } }
+  const [pendingReviews, setPendingReviews] = useState({})
 
   const fetchConversations = useCallback(async () => {
     if (!userId) return
@@ -75,7 +75,6 @@ export default function MessagesInboxPage() {
       .in('tenancy_id', tenancyIds)
 
     const reviewedSet = new Set((existingReviews || []).map(r => r.tenancy_id))
-
     const map = {}
     for (const t of tenancies) {
       if (t.conversation_id) {
@@ -92,13 +91,13 @@ export default function MessagesInboxPage() {
   }, [fetchConversations, fetchPendingReviews, userId])
 
   if (loading) return (
-    <div className="max-w-2xl mx-auto px-4 py-10 space-y-3">
+    <div className="max-w-2xl mx-auto px-6 py-12 space-y-3">
       {[...Array(4)].map((_, i) => (
-        <div key={i} className="bg-white rounded-xl border border-gray-100 p-4 animate-pulse flex gap-3">
-          <div className="w-10 h-10 rounded-full bg-gray-200 flex-shrink-0" />
+        <div key={i} className="border border-hairline bg-canvas p-4 animate-pulse flex gap-3">
+          <div className="w-10 h-10 bg-hairline flex-shrink-0" />
           <div className="flex-1 space-y-2">
-            <div className="h-3 bg-gray-200 rounded w-1/3" />
-            <div className="h-3 bg-gray-200 rounded w-2/3" />
+            <div className="h-3 bg-hairline rounded w-1/3" />
+            <div className="h-3 bg-hairline rounded w-2/3" />
           </div>
         </div>
       ))}
@@ -106,82 +105,103 @@ export default function MessagesInboxPage() {
   )
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Messages</h1>
+    <div className="bg-canvas min-h-screen">
 
-      {conversations.length === 0 ? (
-        <div className="text-center py-16 text-gray-400">
-          <div className="text-5xl mb-4">💬</div>
-          <p className="font-medium text-gray-600">No conversations yet</p>
-          <p className="text-sm mt-1">When you contact a landlord, your conversation will appear here.</p>
-          <Link to="/listings" className="mt-4 inline-block text-red-700 text-sm font-medium hover:underline">
-            Browse listings
-          </Link>
+      {/* Page header */}
+      <div className="border-b border-hairline px-6 py-10">
+        <div className="max-w-2xl mx-auto">
+          <div className="text-[10px] tracking-widest uppercase text-maple mb-3">Inbox</div>
+          <h1 className="font-serif font-normal text-ink" style={{ fontSize: 'clamp(28px, 4vw, 44px)', lineHeight: 1.1 }}>
+            Messages
+          </h1>
         </div>
-      ) : (
-        <div className="space-y-2">
-          {conversations.map(convo => {
-            const isRenter = userId === convo.renter?.id
-            const other = isRenter ? convo.landlord : convo.renter
-            const unread = isRenter ? (convo.renter_unread || 0) : (convo.landlord_unread || 0)
-            const listingImage = convo.listing?.listing_images?.find(i => i.is_primary) || convo.listing?.listing_images?.[0]
-            const pending = pendingReviews[convo.id]
+      </div>
 
-            return (
-              <div key={convo.id} className="space-y-1.5">
-                <Link
-                  to={`/messages/${convo.id}`}
-                  className="flex items-center gap-3 bg-white rounded-xl border border-gray-100 shadow-sm p-4 hover:shadow-md transition-all"
-                >
-                  <Avatar profile={other} />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="font-medium text-sm text-gray-900 truncate">
-                        {other?.full_name || other?.email || 'User'}
+      <div className="max-w-2xl mx-auto px-6 py-8">
+        {conversations.length === 0 ? (
+          <div className="py-24 text-center">
+            <div className="font-serif font-light text-5xl text-stone mb-5">∅</div>
+            <p className="font-serif font-normal text-xl text-ink mb-2">No conversations yet</p>
+            <p className="text-sm text-steel mb-6">When you contact a landlord, your conversation will appear here.</p>
+            <Link
+              to="/listings"
+              className="text-[11px] tracking-widest uppercase text-maple hover:text-maple-dark transition-colors inline-flex items-center gap-2"
+            >
+              Browse listings <span>→</span>
+            </Link>
+          </div>
+        ) : (
+          <div className="space-y-px border border-hairline">
+            {conversations.map(convo => {
+              const isRenter = userId === convo.renter?.id
+              const other = isRenter ? convo.landlord : convo.renter
+              const unread = isRenter ? (convo.renter_unread || 0) : (convo.landlord_unread || 0)
+              const listingImage = convo.listing?.listing_images?.find(i => i.is_primary) || convo.listing?.listing_images?.[0]
+              const pending = pendingReviews[convo.id]
+
+              return (
+                <div key={convo.id}>
+                  <Link
+                    to={`/messages/${convo.id}`}
+                    className={`flex items-center gap-4 p-4 hover:bg-surface transition-colors duration-150 ${unread > 0 ? 'bg-maple-light/40' : 'bg-canvas'}`}
+                  >
+                    <Avatar profile={other} />
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-3 mb-0.5">
+                        <p className={`text-sm truncate ${unread > 0 ? 'font-medium text-ink' : 'font-normal text-charcoal'}`}>
+                          {other?.full_name || other?.email || 'User'}
+                        </p>
+                        <span className="text-[10px] tracking-wide uppercase text-stone flex-shrink-0">
+                          {timeAgo(convo.last_message_at)}
+                        </span>
+                      </div>
+                      <p className="text-[11px] tracking-wide text-steel truncate mb-1">
+                        {convo.listing?.title || 'Listing'}
+                        {convo.unit?.unit_name ? ` · ${convo.unit.unit_name}` : ''}
+                        {convo.listing?.city ? ` · ${convo.listing.city}` : ''}
                       </p>
-                      <span className="text-xs text-gray-400 flex-shrink-0">{timeAgo(convo.last_message_at)}</span>
+                      <p className={`text-xs truncate ${unread > 0 ? 'text-charcoal font-medium' : 'text-stone'}`}>
+                        {convo.last_message || 'No messages yet'}
+                      </p>
                     </div>
-                    <p className="text-xs text-gray-500 truncate mt-0.5">
-                      {convo.listing?.title || 'Listing'}
-                      {convo.unit?.unit_name ? ` · ${convo.unit.unit_name}` : ''}
-                      {convo.unit?.unit_name && convo.room?.room_name ? ` / ${convo.room.room_name}` : ''}
-                      {convo.listing?.city ? ` · ${convo.listing.city}` : ''}
-                    </p>
-                    <p className={`text-xs truncate mt-0.5 ${unread > 0 ? 'text-gray-800 font-medium' : 'text-gray-400'}`}>
-                      {convo.last_message || 'No messages yet'}
-                    </p>
-                  </div>
-                  {listingImage && (
-                    <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100">
-                      <img src={listingImage.url} alt="" loading="lazy" className="w-full h-full object-cover" />
+
+                    {listingImage && (
+                      <div className="w-12 h-12 overflow-hidden flex-shrink-0 bg-surface">
+                        <img src={listingImage.url} alt="" loading="lazy" className="w-full h-full object-cover" />
+                      </div>
+                    )}
+
+                    {unread > 0 && (
+                      <div className="w-5 h-5 bg-maple text-white text-[10px] flex items-center justify-center font-medium flex-shrink-0">
+                        {unread > 9 ? '9+' : unread}
+                      </div>
+                    )}
+                  </Link>
+
+                  {pending && !pending.hasSubmitted && (
+                    <div className="border-t border-hairline">
+                      <ReviewPromptBanner
+                        tenancy={pending.tenancy}
+                        currentUserId={userId}
+                        hasSubmittedReview={pending.hasSubmitted}
+                        reviewWindowClosesAt={pending.tenancy.review_window_closes_at}
+                        listingTitle={convo.listing?.title}
+                        onReviewSubmitted={() => {
+                          setPendingReviews(prev => ({
+                            ...prev,
+                            [convo.id]: { ...prev[convo.id], hasSubmitted: true },
+                          }))
+                        }}
+                      />
                     </div>
                   )}
-                  {unread > 0 && (
-                    <div className="w-5 h-5 bg-red-600 text-white text-xs rounded-full flex items-center justify-center font-bold flex-shrink-0">
-                      {unread > 9 ? '9+' : unread}
-                    </div>
-                  )}
-                </Link>
-                {pending && !pending.hasSubmitted && (
-                  <ReviewPromptBanner
-                    tenancy={pending.tenancy}
-                    currentUserId={userId}
-                    hasSubmittedReview={pending.hasSubmitted}
-                    reviewWindowClosesAt={pending.tenancy.review_window_closes_at}
-                    listingTitle={convo.listing?.title}
-                    onReviewSubmitted={() => {
-                      setPendingReviews(prev => ({
-                        ...prev,
-                        [convo.id]: { ...prev[convo.id], hasSubmitted: true },
-                      }))
-                    }}
-                  />
-                )}
-              </div>
-            )
-          })}
-        </div>
-      )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

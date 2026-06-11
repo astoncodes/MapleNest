@@ -54,7 +54,12 @@ export default function EditListingPage() {
   }, [id, user, authLoading])
 
   if (status === 'loading') {
-    return <div className="max-w-2xl mx-auto px-4 py-10 text-gray-500">Loading...</div>
+    return (
+      <div className="max-w-2xl mx-auto px-6 py-12 animate-pulse space-y-4">
+        <div className="h-10 bg-hairline w-48" />
+        <div className="h-64 bg-hairline" />
+      </div>
+    )
   }
 
   if (status !== 'ready') {
@@ -62,13 +67,11 @@ export default function EditListingPage() {
       ? 'Listing not found.'
       : 'You are not authorized to edit this listing.'
     return (
-      <div className="max-w-2xl mx-auto px-4 py-10 space-y-4 text-center">
-        <p className="text-red-700 text-sm">{message}</p>
-        <button
-          onClick={() => navigate('/profile')}
-          className="text-sm text-red-700 hover:underline"
-        >
-          Back to profile
+      <div className="max-w-2xl mx-auto px-6 py-20 text-center">
+        <p className="font-serif font-normal text-xl text-ink mb-4">{message}</p>
+        <button onClick={() => navigate('/profile')}
+          className="text-[11px] tracking-widest uppercase text-maple hover:text-maple-dark transition-colors">
+          ← Back to profile
         </button>
       </div>
     )

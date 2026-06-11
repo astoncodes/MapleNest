@@ -6,20 +6,24 @@ const TYPE_LABELS = {
   basement: 'Basement', condo: 'Condo', townhouse: 'Townhouse', sublease: 'Sublease'
 }
 
-function BarChart({ data, valueKey = 'count', labelKey = 'label', displayKey, colorClass = 'bg-red-600' }) {
+function BarChart({ data, valueKey = 'count', labelKey = 'label', displayKey }) {
   const max = Math.max(...data.map(d => d[valueKey]), 1)
   return (
-    <div className="flex items-end gap-2 h-40">
+    <div className="flex items-end gap-3 h-44 pt-2">
       {data.map(item => (
-        <div key={item[labelKey]} className="flex flex-col items-center gap-1 flex-1 min-w-0">
-          <span className="text-xs font-medium text-gray-700">{displayKey ? item[displayKey] : item[valueKey]}</span>
-          <div className="w-full flex items-end" style={{ height: '120px' }}>
+        <div key={item[labelKey]} className="flex flex-col items-center gap-2 flex-1 min-w-0">
+          <span className="text-xs font-normal text-charcoal">
+            {displayKey ? item[displayKey] : item[valueKey]}
+          </span>
+          <div className="w-full flex items-end" style={{ height: '100px' }}>
             <div
-              className={`w-full ${colorClass} rounded-t transition-all`}
+              className="w-full bg-maple transition-all duration-500"
               style={{ height: `${Math.max((item[valueKey] / max) * 100, 4)}%` }}
             />
           </div>
-          <span className="text-xs text-gray-500 truncate w-full text-center">{item[labelKey]}</span>
+          <span className="text-[10px] tracking-wide uppercase text-stone truncate w-full text-center">
+            {item[labelKey]}
+          </span>
         </div>
       ))}
     </div>
@@ -28,10 +32,20 @@ function BarChart({ data, valueKey = 'count', labelKey = 'label', displayKey, co
 
 function StatCard({ label, value, sub }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 text-center">
-      <div className="text-2xl font-bold text-gray-900">{value}</div>
-      <div className="text-sm text-gray-500 mt-1">{label}</div>
-      {sub && <div className="text-xs text-gray-400 mt-0.5">{sub}</div>}
+    <div className="border border-hairline bg-canvas p-6">
+      <div className="font-serif font-normal text-3xl text-maple">{value}</div>
+      <div className="text-[10px] tracking-widest uppercase text-stone mt-2">{label}</div>
+      {sub && <div className="text-xs text-steel mt-0.5">{sub}</div>}
+    </div>
+  )
+}
+
+function ChartCard({ title, children }) {
+  return (
+    <div className="border border-hairline bg-canvas p-6">
+      <div className="text-[10px] tracking-widest uppercase text-stone mb-1">{title}</div>
+      <div className="w-6 h-px bg-maple mb-5" />
+      {children}
     </div>
   )
 }
@@ -69,8 +83,7 @@ export default function AnalyticsPage() {
     listings.forEach(l => { cityMap[l.city] = (cityMap[l.city] || 0) + 1 })
     const byCity = Object.entries(cityMap)
       .map(([label, count]) => ({ label, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 6)
+      .sort((a, b) => b.count - a.count).slice(0, 6)
 
     const typeMap = {}
     listings.forEach(l => { typeMap[l.property_type] = (typeMap[l.property_type] || 0) + 1 })
@@ -89,16 +102,15 @@ export default function AnalyticsPage() {
         const avg = Math.round(arr.reduce((a, b) => a + b, 0) / arr.length)
         return { label, count: avg, display: fmt(avg) }
       })
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 6)
+      .sort((a, b) => b.count - a.count).slice(0, 6)
 
     const buckets = [
-      { label: '<$800', min: 0, max: 800 },
-      { label: '$800\u20131k', min: 800, max: 1000 },
-      { label: '$1k\u20131.2k', min: 1000, max: 1200 },
-      { label: '$1.2k\u20131.5k', min: 1200, max: 1500 },
-      { label: '$1.5k\u20132k', min: 1500, max: 2000 },
-      { label: '>$2k', min: 2000, max: Infinity },
+      { label: '<$800',      min: 0,    max: 800 },
+      { label: '$800–1k',    min: 800,  max: 1000 },
+      { label: '$1k–1.2k',  min: 1000, max: 1200 },
+      { label: '$1.2k–1.5k',min: 1200, max: 1500 },
+      { label: '$1.5k–2k',  min: 1500, max: 2000 },
+      { label: '>$2k',       min: 2000, max: Infinity },
     ]
     const priceDistribution = buckets.map(b => ({
       label: b.label,
@@ -109,60 +121,68 @@ export default function AnalyticsPage() {
   }, [listings])
 
   if (loading) return (
-    <div className="max-w-5xl mx-auto px-4 py-10 animate-pulse space-y-4">
-      <div className="h-8 bg-gray-200 rounded w-48" />
-      <div className="grid grid-cols-4 gap-4">
-        {[...Array(4)].map((_, i) => <div key={i} className="h-24 bg-gray-200 rounded-xl" />)}
+    <div className="max-w-5xl mx-auto px-6 md:px-10 py-12 animate-pulse space-y-6">
+      <div className="h-10 bg-hairline w-64" />
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[...Array(4)].map((_, i) => <div key={i} className="h-28 bg-hairline" />)}
       </div>
-      <div className="h-56 bg-gray-200 rounded-xl" />
+      <div className="h-60 bg-hairline" />
     </div>
   )
 
   if (error) return (
-    <div className="max-w-5xl mx-auto px-4 py-16 text-center">
-      <p className="text-red-600 font-medium">Failed to load analytics data.</p>
-      <p className="text-sm text-gray-400 mt-1">{error}</p>
+    <div className="max-w-5xl mx-auto px-6 py-20 text-center">
+      <p className="font-serif font-normal text-xl text-ink mb-2">Failed to load data</p>
+      <p className="text-sm text-steel">{error}</p>
     </div>
   )
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">PEI Rental Market</h1>
-        <p className="text-gray-500 text-sm mt-1">Based on {listings.length} active listings</p>
-      </div>
+    <div className="bg-canvas min-h-screen">
 
-      {/* Summary stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <StatCard label="Total Listings" value={listings.length} />
-        <StatCard label="Average Rent" value={fmt(avgPrice)} sub="per month" />
-        <StatCard label="Lowest Rent" value={fmt(minPrice)} sub="per month" />
-        <StatCard label="Highest Rent" value={fmt(maxPrice)} sub="per month" />
-      </div>
-
-      {/* Charts row */}
-      <div className="grid md:grid-cols-2 gap-6">
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-          <h2 className="font-semibold text-gray-800 mb-4">Listings by City</h2>
-          <BarChart data={byCity} valueKey="count" labelKey="label" colorClass="bg-red-600" />
-        </div>
-
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-          <h2 className="font-semibold text-gray-800 mb-4">Listings by Type</h2>
-          <BarChart data={byType} valueKey="count" labelKey="label" colorClass="bg-red-400" />
+      {/* Page header */}
+      <div className="border-b border-hairline px-6 md:px-10 py-10">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-[10px] tracking-widest uppercase text-maple mb-3">Market Data</div>
+          <h1 className="font-serif font-normal text-ink" style={{ fontSize: 'clamp(32px, 5vw, 52px)', lineHeight: 1.1 }}>
+            PEI Rental Market
+          </h1>
+          <p className="text-[11px] tracking-widest uppercase text-stone mt-3">
+            Based on {listings.length} active listing{listings.length !== 1 ? 's' : ''}
+          </p>
         </div>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-6">
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-          <h2 className="font-semibold text-gray-800 mb-4">Price Distribution</h2>
-          <BarChart data={priceDistribution} valueKey="count" labelKey="label" colorClass="bg-orange-500" />
+      <div className="max-w-5xl mx-auto px-6 md:px-10 py-10 space-y-8">
+
+        {/* Summary stats */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-hairline border border-hairline">
+          <StatCard label="Total Listings" value={listings.length} />
+          <StatCard label="Average Rent"   value={fmt(avgPrice)} sub="per month" />
+          <StatCard label="Lowest Rent"    value={fmt(minPrice)} sub="per month" />
+          <StatCard label="Highest Rent"   value={fmt(maxPrice)} sub="per month" />
         </div>
 
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-          <h2 className="font-semibold text-gray-800 mb-4">Avg Rent by City</h2>
-          <BarChart data={avgByCity} valueKey="count" labelKey="label" displayKey="display" colorClass="bg-amber-500" />
+        {/* Charts row 1 */}
+        <div className="grid md:grid-cols-2 gap-px bg-hairline border border-hairline">
+          <ChartCard title="Listings by City">
+            <BarChart data={byCity} valueKey="count" labelKey="label" />
+          </ChartCard>
+          <ChartCard title="Listings by Type">
+            <BarChart data={byType} valueKey="count" labelKey="label" />
+          </ChartCard>
         </div>
+
+        {/* Charts row 2 */}
+        <div className="grid md:grid-cols-2 gap-px bg-hairline border border-hairline">
+          <ChartCard title="Price Distribution">
+            <BarChart data={priceDistribution} valueKey="count" labelKey="label" />
+          </ChartCard>
+          <ChartCard title="Average Rent by City">
+            <BarChart data={avgByCity} valueKey="count" labelKey="label" displayKey="display" />
+          </ChartCard>
+        </div>
+
       </div>
     </div>
   )

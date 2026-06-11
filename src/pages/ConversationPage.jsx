@@ -8,10 +8,10 @@ import ReviewPromptBanner from '../components/reviews/ReviewPromptBanner'
 
 function Avatar({ profile }) {
   if (profile?.avatar_url) {
-    return <img src={profile.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+    return <img src={profile.avatar_url} alt="" className="w-8 h-8 object-cover flex-shrink-0" />
   }
   return (
-    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center font-bold text-white text-xs flex-shrink-0">
+    <div className="w-8 h-8 bg-maple flex items-center justify-center font-normal text-white text-xs flex-shrink-0">
       {(profile?.full_name || profile?.email || '?').charAt(0).toUpperCase()}
     </div>
   )
@@ -32,7 +32,7 @@ export default function ConversationPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const isNew = id === 'new'
-  const newConvoState = location.state // { listingId, landlordId, listing, landlord, unitId?, unitName?, roomId?, roomName? }
+  const newConvoState = location.state
 
   const [conversation, setConversation] = useState(null)
   const conversationRef = useRef(null)
@@ -48,10 +48,7 @@ export default function ConversationPage() {
   const [showAssignModal, setShowAssignModal] = useState(false)
   const [hasSubmittedReview, setHasSubmittedReview] = useState(false)
 
-  // Keep ref in sync with conversation state for use inside real-time callbacks
-  useEffect(() => {
-    conversationRef.current = conversation
-  }, [conversation])
+  useEffect(() => { conversationRef.current = conversation }, [conversation])
 
   const fetchConversation = useCallback(async () => {
     setLoading(true)
@@ -69,10 +66,7 @@ export default function ConversationPage() {
       .single()
 
     if (convoErr || !convo) { navigate('/messages'); return }
-    if (convo.renter_id !== userId && convo.landlord_id !== userId) {
-      navigate('/messages'); return
-    }
-
+    if (convo.renter_id !== userId && convo.landlord_id !== userId) { navigate('/messages'); return }
     setConversation(convo)
 
     const { data: msgs } = await supabase
@@ -85,50 +79,33 @@ export default function ConversationPage() {
     if (msgs?.length) lastMessageAtRef.current = msgs[msgs.length - 1].created_at
     setLoading(false)
 
-    // Mark other party's messages as read + reset own unread counter
-    await supabase
-      .from('messages')
-      .update({ read: true })
-      .eq('conversation_id', id)
-      .neq('sender_id', userId)
-      .eq('read', false)
+    await supabase.from('messages').update({ read: true })
+      .eq('conversation_id', id).neq('sender_id', userId).eq('read', false)
 
     const unreadField = userId === convo.renter_id ? 'renter_unread' : 'landlord_unread'
     await supabase.from('conversations').update({ [unreadField]: 0 }).eq('id', id)
   }, [id, navigate, userId])
 
-  // Initialize: either fetch existing conversation or set up from router state
   useEffect(() => {
     if (isNew) {
       if (!newConvoState?.listingId) { navigate('/messages'); return }
       setConversation({
-        id: null,
-        renter_id: userId,
-        landlord_id: newConvoState.landlordId,
-        listing: newConvoState.listing,
-        landlord: newConvoState.landlord,
-        renter: user?.profile,
+        id: null, renter_id: userId, landlord_id: newConvoState.landlordId,
+        listing: newConvoState.listing, landlord: newConvoState.landlord, renter: user?.profile,
       })
       if (newConvoState.unitName) {
-        const roomPart = newConvoState.roomName
-          ? ` (${newConvoState.roomName})`
-          : ''
+        const roomPart = newConvoState.roomName ? ` (${newConvoState.roomName})` : ''
         setNewMessage(`Hi, I'm interested in ${newConvoState.unitName}${roomPart} — is it still available?`)
       }
       setLoading(false)
       return
     }
     if (userId) fetchConversation()
-    // user?.profile only reads the initial value for optimistic display in the isNew branch; intentionally excluded to avoid re-running on auth-profile object identity changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchConversation, id, isNew, navigate, newConvoState, userId])
 
-  // Scroll to bottom when messages change
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
 
-  // Fetch tenancy for this conversation (landlord sees management, both see review prompts)
   useEffect(() => {
     if (!conversation?.id || isNew) return
     const fetchTenancy = async () => {
@@ -137,38 +114,28 @@ export default function ConversationPage() {
         .select('id, listing_id, unit_id, room_id, renter_id, landlord_id, conversation_id, move_in, move_out, status, review_window_closes_at, unit:unit_id(unit_name), room:room_id(room_name)')
         .eq('conversation_id', conversation.id)
         .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
+        .limit(1).maybeSingle()
 
       if (data) {
         setTenancy(data)
         const { data: existingReview } = await supabase
-          .from('reviews')
-          .select('id')
-          .eq('tenancy_id', data.id)
-          .eq('reviewer_id', userId)
-          .maybeSingle()
+          .from('reviews').select('id').eq('tenancy_id', data.id).eq('reviewer_id', userId).maybeSingle()
         setHasSubmittedReview(!!existingReview)
       }
     }
     fetchTenancy()
   }, [conversation?.id, isNew, userId])
 
-  // Real-time subscription for new messages from the other party
   useEffect(() => {
     if (!id || isNew || !userId) return
-    const channel = supabase
-      .channel(`messages-${id}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${id}` },
+    const channel = supabase.channel(`messages-${id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${id}` },
         async (payload) => {
           if (payload.new.sender_id === userId) return
           const { data: msg } = await supabase
             .from('messages')
             .select('id, content, created_at, read, sender_id, sender:sender_id(id, full_name, avatar_url, email)')
-            .eq('id', payload.new.id)
-            .single()
+            .eq('id', payload.new.id).single()
           if (msg) {
             setMessages(prev => {
               if (prev.some(m => m.id === msg.id)) return prev
@@ -183,13 +150,11 @@ export default function ConversationPage() {
               setConversation(prev => prev ? { ...prev, [myUnreadField]: 0 } : prev)
             }
           }
-        }
-      )
+        })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [id, isNew, userId])
 
-  // Polling fallback — catches messages real-time misses (e.g. replication not enabled)
   useEffect(() => {
     if (!id || isNew || !userId) return
     const poll = setInterval(async () => {
@@ -198,20 +163,15 @@ export default function ConversationPage() {
       const { data } = await supabase
         .from('messages')
         .select('id, content, created_at, read, sender_id, sender:sender_id(id, full_name, avatar_url, email)')
-        .eq('conversation_id', id)
-        .gt('created_at', since)
-        .order('created_at', { ascending: true })
+        .eq('conversation_id', id).gt('created_at', since).order('created_at', { ascending: true })
       if (!data?.length) return
       setMessages(prev => {
         const existingIds = new Set(prev.map(m => m.id))
         const incoming = data.filter(m => !existingIds.has(m.id))
         if (!incoming.length) return prev
         lastMessageAtRef.current = data[data.length - 1].created_at
-        // Mark other party's new messages as read
         const others = incoming.filter(m => m.sender_id !== userId)
-        if (others.length) {
-          supabase.from('messages').update({ read: true }).in('id', others.map(m => m.id))
-        }
+        if (others.length) supabase.from('messages').update({ read: true }).in('id', others.map(m => m.id))
         return [...prev, ...incoming]
       })
     }, 5000)
@@ -222,146 +182,108 @@ export default function ConversationPage() {
     e.preventDefault()
     const content = newMessage.trim()
     if (!content || sending || !conversation) return
-
     setSending(true)
     setNewMessage('')
     setError(null)
 
-    // New conversation: create the conversation row first, then insert the message
     if (isNew) {
       const { data: convo, error: convoErr } = await supabase
         .from('conversations')
         .insert({
-          listing_id: newConvoState.listingId,
-          renter_id: userId,
+          listing_id: newConvoState.listingId, renter_id: userId,
           landlord_id: newConvoState.landlordId,
-          unit_id: newConvoState.unitId || null,
-          room_id: newConvoState.roomId || null,
+          unit_id: newConvoState.unitId || null, room_id: newConvoState.roomId || null,
         })
-        .select('id')
-        .single()
+        .select('id').single()
 
       if (convoErr) {
-        // Conversation may already exist (race condition) — fall through to existing
-        const { data: existing } = await supabase
-          .from('conversations')
-          .select('id')
-          .eq('listing_id', newConvoState.listingId)
-          .eq('renter_id', userId)
-          .maybeSingle()
-        if (existing) {
-          setSending(false)
-          setNewMessage(content)
-          navigate(`/messages/${existing.id}`, { replace: true })
-          return
-        }
+        const { data: existing } = await supabase.from('conversations').select('id')
+          .eq('listing_id', newConvoState.listingId).eq('renter_id', userId).maybeSingle()
+        if (existing) { setSending(false); setNewMessage(content); navigate(`/messages/${existing.id}`, { replace: true }); return }
         setError('Could not start conversation. Please try again.')
-        setNewMessage(content)
-        setSending(false)
-        return
+        setNewMessage(content); setSending(false); return
       }
 
-      const { error: sendErr } = await supabase
-        .from('messages')
-        .insert({ conversation_id: convo.id, sender_id: userId, content })
-
-      if (sendErr) {
-        setError('Failed to send message. Please try again.')
-        setNewMessage(content)
-        setSending(false)
-        return
-      }
+      const { error: sendErr } = await supabase.from('messages').insert({ conversation_id: convo.id, sender_id: userId, content })
+      if (sendErr) { setError('Failed to send message.'); setNewMessage(content); setSending(false); return }
 
       await supabase.from('conversations').update({
-        last_message: content,
-        last_message_at: new Date().toISOString(),
-        landlord_unread: 1,
+        last_message: content, last_message_at: new Date().toISOString(), landlord_unread: 1,
       }).eq('id', convo.id)
 
-      // Navigate to the real conversation — component remounts and fetches cleanly
       navigate(`/messages/${convo.id}`, { replace: true })
       setSending(false)
       return
     }
 
-    // Existing conversation
     const { data: msg, error: sendErr } = await supabase
       .from('messages')
       .insert({ conversation_id: id, sender_id: userId, content })
       .select('id, content, created_at, read, sender_id, sender:sender_id(id, full_name, avatar_url, email)')
       .single()
 
-    if (sendErr) {
-      setError('Failed to send message. Please try again.')
-      setNewMessage(content)
-      setSending(false)
-      return
-    }
+    if (sendErr) { setError('Failed to send message.'); setNewMessage(content); setSending(false); return }
 
     setMessages(prev => [...prev, msg])
     if (msg) lastMessageAtRef.current = msg.created_at
 
     const otherUnreadField = userId === conversation.renter_id ? 'landlord_unread' : 'renter_unread'
     const currentOtherUnread = userId === conversation.renter_id
-      ? (conversation.landlord_unread || 0)
-      : (conversation.renter_unread || 0)
+      ? (conversation.landlord_unread || 0) : (conversation.renter_unread || 0)
 
     await supabase.from('conversations').update({
-      last_message: content,
-      last_message_at: new Date().toISOString(),
+      last_message: content, last_message_at: new Date().toISOString(),
       [otherUnreadField]: currentOtherUnread + 1,
     }).eq('id', id)
 
     setConversation(prev => prev ? { ...prev, [otherUnreadField]: currentOtherUnread + 1 } : prev)
-
     setSending(false)
     inputRef.current?.focus()
   }
 
   if (loading) return (
-    <div className="max-w-2xl mx-auto px-4 py-10 animate-pulse space-y-4">
-      <div className="h-14 bg-gray-200 rounded-xl" />
+    <div className="max-w-2xl mx-auto px-6 py-10 animate-pulse space-y-4">
+      <div className="h-14 bg-hairline" />
       <div className="space-y-3">
         {[...Array(5)].map((_, i) => (
           <div key={i} className={`flex ${i % 2 === 0 ? '' : 'justify-end'}`}>
-            <div className="h-10 bg-gray-200 rounded-xl w-48" />
+            <div className="h-10 bg-hairline w-48" />
           </div>
         ))}
       </div>
     </div>
   )
 
-  const listingImage = conversation?.listing?.listing_images?.find(i => i.is_primary)
-    || conversation?.listing?.listing_images?.[0]
+  const listingImage = conversation?.listing?.listing_images?.find(i => i.is_primary) || conversation?.listing?.listing_images?.[0]
   const other = userId === conversation?.renter_id ? conversation?.landlord : conversation?.renter
 
   return (
     <div className="max-w-2xl mx-auto flex flex-col" style={{ height: 'calc(100vh - 64px)' }}>
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3 flex-shrink-0">
-        <Link to="/messages" className="text-gray-400 hover:text-gray-600 text-lg leading-none">←</Link>
+
+      {/* Conversation header */}
+      <div className="bg-canvas border-b border-hairline px-5 py-3.5 flex items-center gap-3 flex-shrink-0">
+        <Link to="/messages" className="text-steel hover:text-ink transition-colors text-base leading-none mr-1">←</Link>
         {listingImage && (
-          <div className="w-10 h-10 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+          <div className="w-10 h-10 overflow-hidden bg-surface flex-shrink-0">
             <img src={listingImage.url} alt="" className="w-full h-full object-cover" />
           </div>
         )}
         <div className="flex-1 min-w-0">
           <Link
             to={conversation?.listing?.id ? `/listings/${conversation.listing.id}` : '#'}
-            className="font-semibold text-sm text-gray-900 hover:text-red-700 truncate block transition"
+            className="font-normal text-sm text-ink hover:text-maple truncate block transition-colors"
           >
             {conversation?.listing?.title || 'Listing'}
           </Link>
-          <p className="text-xs text-gray-500 truncate">
+          <p className="text-[10px] tracking-wide uppercase text-stone truncate">
             {other?.full_name || other?.email || 'User'}
             {conversation?.unit?.unit_name ? ` · ${conversation.unit.unit_name}` : ''}
-            {conversation?.unit?.unit_name && conversation?.room?.room_name ? ` / ${conversation.room.room_name}` : ''}
             {conversation?.listing?.city ? ` · ${conversation.listing.city}` : ''}
           </p>
         </div>
       </div>
 
-      {/* Tenancy bar — landlord only */}
+      {/* Tenancy bar */}
       {userId === conversation?.landlord_id && conversation?.listing?.id && (
         <TenancyBar
           tenancy={tenancy?.status === 'active' ? tenancy : null}
@@ -370,9 +292,9 @@ export default function ConversationPage() {
         />
       )}
 
-      {/* Review prompt — both parties, after tenancy ends */}
+      {/* Review prompt */}
       {tenancy?.status === 'ended' && (
-        <div className="px-4 py-2 flex-shrink-0">
+        <div className="px-5 py-2 flex-shrink-0 border-b border-hairline">
           <ReviewPromptBanner
             tenancy={tenancy}
             currentUserId={userId}
@@ -385,26 +307,28 @@ export default function ConversationPage() {
       )}
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+      <div className="flex-1 overflow-y-auto px-5 py-6 space-y-4 bg-canvas">
         {messages.length === 0 && (
-          <p className="text-center text-sm text-gray-400 py-8">
+          <p className="text-center text-sm text-stone py-10">
             {isNew ? 'Send a message to start the conversation.' : 'No messages yet. Say hello!'}
           </p>
         )}
         {messages.map(msg => {
           const isOwn = msg.sender_id === userId
           return (
-            <div key={msg.id} className={`flex items-end gap-2 ${isOwn ? 'justify-end' : 'justify-start'}`}>
+            <div key={msg.id} className={`flex items-end gap-2.5 ${isOwn ? 'justify-end' : 'justify-start'}`}>
               {!isOwn && <Avatar profile={msg.sender} />}
-              <div className={`max-w-xs lg:max-w-sm flex flex-col gap-1 ${isOwn ? 'items-end' : 'items-start'}`}>
-                <div className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
+              <div className={`max-w-xs lg:max-w-sm flex flex-col gap-1.5 ${isOwn ? 'items-end' : 'items-start'}`}>
+                <div className={`px-4 py-2.5 text-sm leading-relaxed ${
                   isOwn
-                    ? 'bg-red-700 text-white rounded-br-md'
-                    : 'bg-gray-100 text-gray-800 rounded-bl-md'
+                    ? 'bg-ink text-canvas'
+                    : 'bg-surface text-charcoal border border-hairline'
                 }`}>
                   {msg.content}
                 </div>
-                <span className="text-xs text-gray-400 px-1">{formatTime(msg.created_at)}</span>
+                <span className="text-[10px] tracking-wide uppercase text-stone px-1">
+                  {formatTime(msg.created_at)}
+                </span>
               </div>
               {isOwn && <Avatar profile={user.profile} />}
             </div>
@@ -414,25 +338,25 @@ export default function ConversationPage() {
       </div>
 
       {/* Send input */}
-      <div className="border-t border-gray-200 bg-white px-4 py-3 flex-shrink-0">
-        {error && <p className="text-xs text-red-600 mb-2">{error}</p>}
-        <form onSubmit={handleSend} className="flex gap-2">
+      <div className="border-t border-hairline bg-canvas px-5 py-3.5 flex-shrink-0">
+        {error && <p className="text-xs text-maple mb-2">{error}</p>}
+        <form onSubmit={handleSend} className="flex gap-3" style={{ borderBottom: '1px solid #E8E0D5' }}>
           <input
             ref={inputRef}
             type="text"
             value={newMessage}
             onChange={e => setNewMessage(e.target.value)}
             placeholder="Type a message..."
-            className="flex-1 border border-gray-200 rounded-full px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
+            className="flex-1 bg-transparent py-3 text-sm text-charcoal placeholder:text-stone focus:outline-none font-light"
             maxLength={2000}
             disabled={sending}
           />
           <button
             type="submit"
             disabled={!newMessage.trim() || sending}
-            className="bg-red-700 text-white px-5 py-2.5 rounded-full text-sm font-medium hover:bg-red-800 transition disabled:opacity-40"
+            className="text-[11px] tracking-widest uppercase text-maple hover:text-maple-dark transition-colors py-3 pl-4 flex-shrink-0 disabled:opacity-30"
           >
-            {sending ? '...' : 'Send'}
+            {sending ? '...' : 'Send →'}
           </button>
         </form>
       </div>
@@ -442,10 +366,7 @@ export default function ConversationPage() {
           listingId={conversation.listing.id}
           renterId={conversation.renter_id}
           conversationId={conversation.id}
-          onAssigned={(t) => {
-            setTenancy(t)
-            setShowAssignModal(false)
-          }}
+          onAssigned={(t) => { setTenancy(t); setShowAssignModal(false) }}
           onClose={() => setShowAssignModal(false)}
         />
       )}
