@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 
 export default function SignupPage() {
+  const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [role, setRole] = useState('renter')
@@ -16,9 +17,13 @@ export default function SignupPage() {
     setError(null)
     setLoading(true)
     try {
-      const { error } = await signUp(email, password, role)
+      const { data, error } = await signUp(email, password, role)
       if (error) {
         setError(error.message)
+      } else if (data?.session) {
+        // Supabase auto-confirm is on: the user is already signed in, so
+        // "check your email" would be misleading — go straight to browsing (B34).
+        navigate('/listings', { replace: true })
       } else {
         setSuccess(true)
       }

@@ -1,4 +1,4 @@
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
@@ -7,6 +7,7 @@ export default function Navbar() {
   const { user, signOut, isLandlord } = useAuth()
   const userId = user?.id
   const navigate = useNavigate()
+  const { pathname } = useLocation()
   const [unreadCount, setUnreadCount] = useState(0)
   const [menuOpen, setMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
@@ -19,25 +20,24 @@ export default function Navbar() {
 
   useEffect(() => {
     if (!userId) { setUnreadCount(0); return }
+    // Single cheap aggregate on the server (B10) instead of pulling every
+    // conversation row and summing client-side.
     const fetchUnread = () => {
-      supabase
-        .from('conversations')
-        .select('renter_id, landlord_id, renter_unread, landlord_unread')
-        .or(`renter_id.eq.${userId},landlord_id.eq.${userId}`)
-        .then(({ data, error }) => {
-          if (error) { console.error('Navbar: failed to fetch unread counts', error); return }
-          if (!data) return
-          const total = data.reduce((sum, c) =>
-            sum + (userId === c.renter_id ? (c.renter_unread || 0) : (c.landlord_unread || 0)), 0)
-          setUnreadCount(total)
-        })
+      supabase.rpc('user_unread_total').then(({ data, error }) => {
+        if (error) { console.error('Navbar: failed to fetch unread total', error); return }
+        setUnreadCount(data ?? 0)
+      })
     }
     fetchUnread()
     const interval = setInterval(fetchUnread, 30000)
-    return () => clearInterval(interval)
-  }, [userId])
+    const onFocus = () => fetchUnread()
+    window.addEventListener('focus', onFocus)
+    return () => { clearInterval(interval); window.removeEventListener('focus', onFocus) }
+  }, [userId, pathname])
 
-  useEffect(() => { setMenuOpen(false) }, [navigate])
+  // Close the mobile menu whenever the route actually changes (B9) —
+  // `navigate` is a stable reference, so depending on it never re-fires.
+  useEffect(() => { setMenuOpen(false) }, [pathname])
 
   const handleSignOut = async () => {
     setMenuOpen(false)

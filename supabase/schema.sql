@@ -548,6 +548,15 @@ CREATE INDEX IF NOT EXISTS idx_listing_units_listing_id_sort_order
   ON public.listing_units (listing_id, sort_order);
 CREATE INDEX IF NOT EXISTS idx_listing_unit_rooms_unit_id
   ON public.listing_unit_rooms (unit_id);
+-- Inbox + navbar unread queries filter conversations by participant (B38)
+CREATE INDEX IF NOT EXISTS idx_conversations_renter_id
+  ON public.conversations (renter_id);
+CREATE INDEX IF NOT EXISTS idx_conversations_landlord_id
+  ON public.conversations (landlord_id);
+CREATE INDEX IF NOT EXISTS idx_conversations_last_message_at
+  ON public.conversations (last_message_at DESC NULLS LAST);
+CREATE INDEX IF NOT EXISTS idx_messages_conversation_id_created_at
+  ON public.messages (conversation_id, created_at);
 
 -- ── listing_units RLS ─────────────────────────────────────────────────────────
 -- (Table itself is declared earlier, before public.conversations, so FKs resolve.)
