@@ -110,7 +110,7 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
         [...(listing.listing_images || [])].sort((a, b) => {
           if (a.is_primary && !b.is_primary) return -1
           if (!a.is_primary && b.is_primary) return 1
-          return a.sort_order - b.sort_order
+          return (a.sort_order ?? 0) - (b.sort_order ?? 0)
         })
       )
       if (listing?.id) {

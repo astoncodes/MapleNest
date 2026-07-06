@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './hooks/useAuth'
+import { supabaseConfigError } from './lib/supabase'
 import Navbar from './components/shared/Navbar'
 import HomePage from './pages/HomePage'
 import LoginPage from './pages/LoginPage'
@@ -58,7 +59,27 @@ function AppRoutes() {
   )
 }
 
+function ConfigErrorScreen({ message }) {
+  return (
+    <div className="min-h-screen flex items-center justify-center px-4 bg-gray-50">
+      <div className="max-w-md text-center">
+        <div className="text-5xl mb-4">🍁</div>
+        <h1 className="text-xl font-bold text-gray-800 mb-2">MapleNest isn&apos;t configured</h1>
+        <p className="text-gray-600 text-sm mb-4">{message}</p>
+        <p className="text-gray-400 text-xs">
+          If you&apos;re the site owner, set <code className="bg-gray-100 px-1 rounded">VITE_SUPABASE_URL</code>
+          {' '}and <code className="bg-gray-100 px-1 rounded">VITE_SUPABASE_ANON_KEY</code> and redeploy.
+        </p>
+      </div>
+    </div>
+  )
+}
+
 export default function App() {
+  if (supabaseConfigError) {
+    return <ConfigErrorScreen message={supabaseConfigError} />
+  }
+
   return (
     <AuthProvider>
       <AppRoutes />

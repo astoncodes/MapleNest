@@ -179,12 +179,12 @@ export default function ListingDetailPage() {
 
     if (error || !data) { navigate('/listings'); return }
 
-    // Sort images: primary first, then by sort_order
+    // Sort images: primary first, then by sort_order (treat null as 0 to keep ordering deterministic)
     if (data.listing_images?.length > 0) {
       data.listing_images.sort((a, b) => {
         if (a.is_primary && !b.is_primary) return -1
         if (!a.is_primary && b.is_primary) return 1
-        return a.sort_order - b.sort_order
+        return (a.sort_order ?? 0) - (b.sort_order ?? 0)
       })
     }
 
@@ -275,6 +275,7 @@ export default function ListingDetailPage() {
 
   const handleReport = async () => {
     if (!reportReason) return
+    if (!user) { navigate('/login'); return }
     setReportSubmitting(true)
     setReportError(null)
     const { error } = await supabase.from('reports').insert({
@@ -303,7 +304,7 @@ export default function ListingDetailPage() {
   const images = listing.listing_images || []
   const isOwnListing = user?.id === listing.landlord_id
   const saved = isSaved(listing.id)
-  const formatPrice = p => `$${p.toLocaleString()}`
+  const formatPrice = p => (p == null || Number.isNaN(Number(p))) ? 'Contact for price' : `$${Number(p).toLocaleString()}`
   const formatDate = d => d
     ? new Date(d).toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric' })
     : 'Immediately'
@@ -340,7 +341,7 @@ export default function ListingDetailPage() {
             </div>
             <div className="text-right">
               <div className="text-3xl font-bold text-red-700">{formatPrice(listing.price)}</div>
-              <div className="text-sm text-gray-400">/month</div>
+              {listing.price != null && <div className="text-sm text-gray-400">/month</div>}
               {listing.utilities_included && (
                 <div className="text-xs text-green-600 font-medium mt-1">✓ Utilities included</div>
               )}
@@ -433,7 +434,7 @@ export default function ListingDetailPage() {
             {/* Price */}
             <div className="text-center mb-5">
               <div className="text-3xl font-bold text-red-700">{formatPrice(listing.price)}</div>
-              <div className="text-xs text-gray-400 mt-0.5">per month</div>
+              {listing.price != null && <div className="text-xs text-gray-400 mt-0.5">per month</div>}
             </div>
 
             {user && !isOwnListing && (
