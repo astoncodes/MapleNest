@@ -47,10 +47,18 @@ export default function ConversationPage() {
   const [tenancy, setTenancy] = useState(null)
   const [showAssignModal, setShowAssignModal] = useState(false)
   const [hasSubmittedReview, setHasSubmittedReview] = useState(false)
+  const [realtimeHealthy, setRealtimeHealthy] = useState(true)
+
+  // Capture router state into a ref — location.state is a new object reference
+  // every render, so including it directly in effect deps causes refetch storms
+  // on every re-render (B18).
+  const newConvoStateRef = useRef(newConvoState)
+  useEffect(() => { newConvoStateRef.current = newConvoState }, [newConvoState])
 
   useEffect(() => { conversationRef.current = conversation }, [conversation])
 
   const fetchConversation = useCallback(async () => {
+    if (!userId) return
     setLoading(true)
     const { data: convo, error: convoErr } = await supabase
       .from('conversations')
@@ -94,26 +102,33 @@ export default function ConversationPage() {
 
   useEffect(() => {
     if (isNew) {
-      if (!newConvoState?.listingId) { navigate('/messages'); return }
+      const state = newConvoStateRef.current
+      if (!state?.listingId) { navigate('/messages'); return }
       setConversation({
-        id: null, renter_id: userId, landlord_id: newConvoState.landlordId,
-        listing: newConvoState.listing, landlord: newConvoState.landlord, renter: user?.profile,
+        id: null,
+        renter_id: userId,
+        landlord_id: state.landlordId,
+        listing: state.listing,
+        landlord: state.landlord,
+        renter: user?.profile,
       })
-      if (newConvoState.unitName) {
-        const roomPart = newConvoState.roomName ? ` (${newConvoState.roomName})` : ''
-        setNewMessage(`Hi, I'm interested in ${newConvoState.unitName}${roomPart} — is it still available?`)
+      if (state.unitName) {
+        const roomPart = state.roomName
+          ? ` (${state.roomName})`
+          : ''
+        setNewMessage(`Hi, I'm interested in ${state.unitName}${roomPart} — is it still available?`)
       }
       setLoading(false)
       return
     }
     if (userId) fetchConversation()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fetchConversation, id, isNew, navigate, newConvoState, userId])
+  }, [fetchConversation, id, isNew, navigate, userId])
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
 
   useEffect(() => {
-    if (!conversation?.id || isNew) return
+    if (!conversation?.id || isNew || !userId) return
     const fetchTenancy = async () => {
       const { data } = await supabase
         .from('tenancies')
@@ -132,10 +147,16 @@ export default function ConversationPage() {
     fetchTenancy()
   }, [conversation?.id, isNew, userId])
 
+  // Real-time subscription for new messages from the other party.
+  // Depend on userId (primitive) not user (object) so the subscription
+  // doesn't tear down and recreate on every token refresh (B33).
   useEffect(() => {
     if (!id || isNew || !userId) return
-    const channel = supabase.channel(`messages-${id}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${id}` },
+    const channel = supabase
+      .channel(`messages-${id}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${id}` },
         async (payload) => {
           if (payload.new.sender_id === userId) return
           const { data: msg } = await supabase
@@ -156,13 +177,25 @@ export default function ConversationPage() {
               setConversation(prev => prev ? { ...prev, [myUnreadField]: 0 } : prev)
             }
           }
-        })
-      .subscribe()
+        }
+      )
+      .subscribe((status) => {
+        // Supabase emits CHANNEL_ERROR / TIMED_OUT when the socket can't
+        // keep up (replication disabled, network partition). Flip to
+        // polling fallback in those cases; keep polling off otherwise (B26).
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          setRealtimeHealthy(false)
+        } else if (status === 'SUBSCRIBED') {
+          setRealtimeHealthy(true)
+        }
+      })
     return () => { supabase.removeChannel(channel) }
   }, [id, isNew, userId])
 
+  // Polling fallback — only runs when realtime reports an unhealthy channel (B26).
+  // Prevents doubling up network traffic when realtime is working fine.
   useEffect(() => {
-    if (!id || isNew || !userId) return
+    if (!id || isNew || !userId || realtimeHealthy) return
     const poll = setInterval(async () => {
       const since = lastMessageAtRef.current
       if (!since) return
@@ -182,7 +215,7 @@ export default function ConversationPage() {
       })
     }, 5000)
     return () => clearInterval(poll)
-  }, [id, isNew, userId])
+  }, [id, isNew, userId, realtimeHealthy])
 
   const handleSend = async (e) => {
     e.preventDefault()

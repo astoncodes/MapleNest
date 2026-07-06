@@ -215,11 +215,14 @@ export default function ListingDetailPage() {
     setContactError(null)
 
     try {
+      // General "Contact" path is always whole-listing, unit_id/room_id are NULL.
       const { data: existing } = await supabase
         .from('conversations')
         .select('id')
         .eq('listing_id', id)
         .eq('renter_id', user.id)
+        .is('unit_id', null)
+        .is('room_id', null)
         .maybeSingle()
 
       if (existing) { navigate(`/messages/${existing.id}`); return }
@@ -246,12 +249,15 @@ export default function ListingDetailPage() {
     if (user.id === listing.landlord_id) return
 
     try {
-      const { data: existing } = await supabase
+      // Scope lookup to (unit_id, room_id) so Unit A and Unit B get separate threads (B2).
+      let query = supabase
         .from('conversations')
         .select('id')
         .eq('listing_id', id)
         .eq('renter_id', user.id)
-        .maybeSingle()
+      query = unitId ? query.eq('unit_id', unitId) : query.is('unit_id', null)
+      query = roomId ? query.eq('room_id', roomId) : query.is('room_id', null)
+      const { data: existing } = await query.maybeSingle()
 
       if (existing) { navigate(`/messages/${existing.id}`); return }
 
