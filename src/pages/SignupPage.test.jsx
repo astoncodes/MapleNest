@@ -29,8 +29,8 @@ describe('SignupPage — rendering', () => {
   it('defaults to renter role selected', () => {
     renderPage()
     const renterBtn = screen.getByRole('button', { name: /renter/i })
-    expect(renterBtn).toHaveClass('bg-red-700')
-    expect(screen.getByRole('button', { name: /landlord/i })).not.toHaveClass('bg-red-700')
+    expect(renterBtn).toHaveClass('bg-maple-red')
+    expect(screen.getByRole('button', { name: /landlord/i })).not.toHaveClass('bg-maple-red')
   })
 })
 
@@ -40,8 +40,8 @@ describe('SignupPage — role selection', () => {
   it('switching to landlord highlights the landlord button', async () => {
     renderPage()
     await userEvent.click(screen.getByRole('button', { name: /landlord/i }))
-    expect(screen.getByRole('button', { name: /landlord/i })).toHaveClass('bg-red-700')
-    expect(screen.getByRole('button', { name: /renter/i })).not.toHaveClass('bg-red-700')
+    expect(screen.getByRole('button', { name: /landlord/i })).toHaveClass('bg-maple-red')
+    expect(screen.getByRole('button', { name: /renter/i })).not.toHaveClass('bg-maple-red')
   })
 
   it('sends selected role to signUp', async () => {
