@@ -1,50 +1,42 @@
 # MapleNest Setup Guide
 
-## 1. Push to GitHub
+Short version — full details in [README.md](README.md).
 
-```bash
-git init
-git add .
-git commit -m "feat: initial MapleNest project scaffold"
-git branch -M main
-git remote add origin https://github.com/YOUR_USERNAME/maplenest.git
-git push -u origin main
-```
+## 1. Create a Supabase project
 
-## 2. Create Supabase Project
+1. [supabase.com](https://supabase.com) → New Project (Canada Central).
+2. SQL Editor → run `supabase/schema.sql` in full. It creates all tables,
+   RLS policies, RPC functions, indexes, and both storage buckets — no manual
+   bucket step needed. See [supabase/README.md](supabase/README.md) for the
+   upgrade path of an existing database.
 
-1. Go to [supabase.com](https://supabase.com) → New Project
-2. Name it `maplenest`, choose **Canada (Central)** region
-3. Copy your **Project URL** and **anon public key**
-4. Go to **Storage** → create a bucket called `listing-images` (public)
-5. Go to **SQL Editor** → paste and run `supabase/schema.sql`
-
-If you already ran the schema before creating storage policies, run the SQL files in `supabase/migration_*.sql` from the SQL Editor.
-
-## 3. Configure Environment
+## 2. Configure environment
 
 ```bash
 cp .env.example .env
 ```
 
-Fill in `.env`:
+Fill in from Supabase → Project Settings → API:
+
 ```
 VITE_SUPABASE_URL=https://xxxx.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJ...
+VITE_SUPABASE_ANON_KEY=<the "anon public" key>
 ```
 
-## 4. Install & Run
+⚠️ Use the **anon public** key only. The app refuses to start with a
+service_role key — that key must never reach a browser bundle.
+
+## 3. Install & run
 
 ```bash
-npm install
-npm run dev
+npm ci
+npm run dev     # http://localhost:5173
 ```
 
-Open http://localhost:5173
+## 4. Deploy to Vercel
 
-## 5. Deploy to Vercel
+1. Push to GitHub and import at [vercel.com](https://vercel.com).
+2. Add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` env vars.
+3. Deploy. CI (GitHub Actions) runs lint/tests/build on every PR.
 
-1. Push repo to GitHub
-2. Import at [vercel.com](https://vercel.com)
-3. Add environment variables (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY)
-4. Deploy!
+Production operations, release, and rollback: [docs/PRODUCTION.md](docs/PRODUCTION.md).
