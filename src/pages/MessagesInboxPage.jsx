@@ -49,8 +49,7 @@ export default function MessagesInboxPage() {
         room:room_id(id, room_name)
       `)
       .or(`renter_id.eq.${userId},landlord_id.eq.${userId}`)
-      .not('last_message', 'is', null)
-      .order('last_message_at', { ascending: false })
+      .order('last_message_at', { ascending: false, nullsFirst: false })
 
     setConversations(data || [])
     setLoading(false)

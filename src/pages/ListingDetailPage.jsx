@@ -160,6 +160,8 @@ export default function ListingDetailPage() {
   const [listing, setListing] = useState(null)
   const [landlord, setLandlord] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [notFound, setNotFound] = useState(false)
+  const [fetchError, setFetchError] = useState(null)
   const [contacting, setContacting] = useState(false)
   const { isSaved, toggleSave } = useSavedListings()
   const [contactError, setContactError] = useState(null)
@@ -171,20 +173,34 @@ export default function ListingDetailPage() {
   const [reportError, setReportError] = useState(null)
 
   const fetchListing = useCallback(async () => {
+    setLoading(true)
+    setNotFound(false)
+    setFetchError(null)
+
     const { data, error } = await supabase
       .from('listings')
       .select('*, listing_images(id, url, is_primary, sort_order), listing_units(id, unit_name, floor, price, available_from, notes, status, room_rental, sort_order, listing_unit_rooms(id, room_name, price, available_from, status, sort_order))')
       .eq('id', id)
       .single()
 
-    if (error || !data) { navigate('/listings'); return }
+    if (error) {
+      // PGRST116 = PostgREST "no rows returned" — that's a genuine 404.
+      // Anything else (network, 5xx, auth hiccup) is transient and should
+      // offer a retry rather than silently punting the user to /listings.
+      if (error.code === 'PGRST116') setNotFound(true)
+      else setFetchError(error.message || 'Could not load this listing.')
+      setLoading(false)
+      return
+    }
 
-    // Sort images: primary first, then by sort_order
+    if (!data) { setNotFound(true); setLoading(false); return }
+
+    // Sort images: primary first, then by sort_order (treat null as 0 to keep ordering deterministic)
     if (data.listing_images?.length > 0) {
       data.listing_images.sort((a, b) => {
         if (a.is_primary && !b.is_primary) return -1
         if (!a.is_primary && b.is_primary) return 1
-        return a.sort_order - b.sort_order
+        return (a.sort_order ?? 0) - (b.sort_order ?? 0)
       })
     }
 
@@ -201,7 +217,7 @@ export default function ListingDetailPage() {
 
     // Atomic increment — avoids race condition under concurrent views
     supabase.rpc('increment_views', { p_listing_id: id })
-  }, [id, navigate])
+  }, [id])
 
   useEffect(() => {
     fetchListing()
@@ -215,11 +231,14 @@ export default function ListingDetailPage() {
     setContactError(null)
 
     try {
+      // General "Contact" path is always whole-listing, unit_id/room_id are NULL.
       const { data: existing } = await supabase
         .from('conversations')
         .select('id')
         .eq('listing_id', id)
         .eq('renter_id', user.id)
+        .is('unit_id', null)
+        .is('room_id', null)
         .maybeSingle()
 
       if (existing) { navigate(`/messages/${existing.id}`); return }
@@ -246,12 +265,15 @@ export default function ListingDetailPage() {
     if (user.id === listing.landlord_id) return
 
     try {
-      const { data: existing } = await supabase
+      // Scope lookup to (unit_id, room_id) so Unit A and Unit B get separate threads (B2).
+      let query = supabase
         .from('conversations')
         .select('id')
         .eq('listing_id', id)
         .eq('renter_id', user.id)
-        .maybeSingle()
+      query = unitId ? query.eq('unit_id', unitId) : query.is('unit_id', null)
+      query = roomId ? query.eq('room_id', roomId) : query.is('room_id', null)
+      const { data: existing } = await query.maybeSingle()
 
       if (existing) { navigate(`/messages/${existing.id}`); return }
 
@@ -275,6 +297,7 @@ export default function ListingDetailPage() {
 
   const handleReport = async () => {
     if (!reportReason) return
+    if (!user) { navigate('/login'); return }
     setReportSubmitting(true)
     setReportError(null)
     const { error } = await supabase.from('reports').insert({
@@ -300,10 +323,38 @@ export default function ListingDetailPage() {
     </div>
   )
 
+  if (notFound || !listing) return (
+    <div className="max-w-xl mx-auto px-4 py-16 text-center space-y-4">
+      <div className="text-5xl">🏚</div>
+      <p className="font-medium text-gray-700">Listing not found</p>
+      <p className="text-sm text-gray-500">It may have been removed or the link is incorrect.</p>
+      <Link to="/listings" className="inline-block text-red-700 text-sm font-medium hover:underline">
+        Browse listings
+      </Link>
+    </div>
+  )
+
+  if (fetchError) return (
+    <div className="max-w-xl mx-auto px-4 py-16 text-center space-y-4">
+      <div className="text-4xl">⚠️</div>
+      <p className="font-medium text-gray-700">We couldn’t load this listing</p>
+      <p className="text-sm text-gray-500">{fetchError}</p>
+      <div className="flex justify-center gap-3">
+        <button onClick={fetchListing}
+          className="px-4 py-2 text-sm font-medium bg-red-700 text-white rounded-lg hover:bg-red-800 transition">
+          Try again
+        </button>
+        <Link to="/listings" className="text-sm text-gray-500 hover:text-gray-700 self-center">
+          Back to listings
+        </Link>
+      </div>
+    </div>
+  )
+
   const images = listing.listing_images || []
   const isOwnListing = user?.id === listing.landlord_id
   const saved = isSaved(listing.id)
-  const formatPrice = p => `$${p.toLocaleString()}`
+  const formatPrice = p => (p == null || Number.isNaN(Number(p))) ? 'Contact for price' : `$${Number(p).toLocaleString()}`
   const formatDate = d => d
     ? new Date(d).toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric' })
     : 'Immediately'
@@ -340,7 +391,7 @@ export default function ListingDetailPage() {
             </div>
             <div className="text-right">
               <div className="text-3xl font-bold text-red-700">{formatPrice(listing.price)}</div>
-              <div className="text-sm text-gray-400">/month</div>
+              {listing.price != null && <div className="text-sm text-gray-400">/month</div>}
               {listing.utilities_included && (
                 <div className="text-xs text-green-600 font-medium mt-1">✓ Utilities included</div>
               )}
@@ -433,7 +484,7 @@ export default function ListingDetailPage() {
             {/* Price */}
             <div className="text-center mb-5">
               <div className="text-3xl font-bold text-red-700">{formatPrice(listing.price)}</div>
-              <div className="text-xs text-gray-400 mt-0.5">per month</div>
+              {listing.price != null && <div className="text-xs text-gray-400 mt-0.5">per month</div>}
             </div>
 
             {user && !isOwnListing && (

@@ -83,7 +83,7 @@ function RoomRow({ room, unitPrice, basePrice, baseDate, unitId, unitName, onReq
 
 function RoomRentalUnit({ unit, basePrice, baseDate, onRequest = () => {}, isOwn }) {
   const [open, setOpen] = useState(true)
-  const rooms = [...(unit.listing_unit_rooms || [])].sort((a, b) => a.sort_order - b.sort_order)
+  const rooms = [...(unit.listing_unit_rooms || [])].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
   const availableCount = rooms.filter(r => r.status === 'available').length
   const totalCount = rooms.length
 
@@ -137,7 +137,7 @@ export default function UnitSection({ units, basePrice, baseDate, onRequest = ()
       ? (b.listing_unit_rooms || []).every(r => r.status === 'occupied')
       : b.status === 'rented'
     if (aRented !== bRented) return aRented ? 1 : -1
-    return a.sort_order - b.sort_order
+    return (a.sort_order ?? 0) - (b.sort_order ?? 0)
   })
 
   const availableCount = units.filter(u => {

@@ -110,7 +110,7 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
         [...(listing.listing_images || [])].sort((a, b) => {
           if (a.is_primary && !b.is_primary) return -1
           if (!a.is_primary && b.is_primary) return 1
-          return a.sort_order - b.sort_order
+          return (a.sort_order ?? 0) - (b.sort_order ?? 0)
         })
       )
       if (listing?.id) {
@@ -285,7 +285,7 @@ export default function CreateListingPage({ mode = 'create', listing = null, onS
 
         {/* Step indicator */}
         <div className="flex items-center gap-0 mb-10 border border-hairline overflow-hidden">
-          {[1, 2, 3, ...(isRenter ? [] : [4])].map((s, idx, arr) => (
+          {[1, 2, 3, ...(isRenter ? [] : [4])].map((s) => (
             <div key={s} className={`flex-1 flex items-center justify-center gap-2 py-3 text-[10px] tracking-widest uppercase transition-colors border-r border-hairline last:border-r-0 ${
               s < step ? 'bg-maple text-white'
               : s === step ? 'bg-ink text-canvas'

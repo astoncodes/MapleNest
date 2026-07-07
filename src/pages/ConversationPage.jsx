@@ -47,10 +47,18 @@ export default function ConversationPage() {
   const [tenancy, setTenancy] = useState(null)
   const [showAssignModal, setShowAssignModal] = useState(false)
   const [hasSubmittedReview, setHasSubmittedReview] = useState(false)
+  const [realtimeHealthy, setRealtimeHealthy] = useState(true)
+
+  // Capture router state into a ref — location.state is a new object reference
+  // every render, so including it directly in effect deps causes refetch storms
+  // on every re-render (B18).
+  const newConvoStateRef = useRef(newConvoState)
+  useEffect(() => { newConvoStateRef.current = newConvoState }, [newConvoState])
 
   useEffect(() => { conversationRef.current = conversation }, [conversation])
 
   const fetchConversation = useCallback(async () => {
+    if (!userId) return
     setLoading(true)
     const { data: convo, error: convoErr } = await supabase
       .from('conversations')
@@ -79,35 +87,48 @@ export default function ConversationPage() {
     if (msgs?.length) lastMessageAtRef.current = msgs[msgs.length - 1].created_at
     setLoading(false)
 
-    await supabase.from('messages').update({ read: true })
-      .eq('conversation_id', id).neq('sender_id', userId).eq('read', false)
+    // Mark other party's messages as read + reset own unread counter.
+    // reset_unread figures out which side to zero from auth.uid() and is atomic,
+    // so two tabs on the same conversation can't race each other (B3).
+    await supabase
+      .from('messages')
+      .update({ read: true })
+      .eq('conversation_id', id)
+      .neq('sender_id', userId)
+      .eq('read', false)
 
-    const unreadField = userId === convo.renter_id ? 'renter_unread' : 'landlord_unread'
-    await supabase.from('conversations').update({ [unreadField]: 0 }).eq('id', id)
+    await supabase.rpc('reset_unread', { p_conversation_id: id })
   }, [id, navigate, userId])
 
   useEffect(() => {
     if (isNew) {
-      if (!newConvoState?.listingId) { navigate('/messages'); return }
+      const state = newConvoStateRef.current
+      if (!state?.listingId) { navigate('/messages'); return }
       setConversation({
-        id: null, renter_id: userId, landlord_id: newConvoState.landlordId,
-        listing: newConvoState.listing, landlord: newConvoState.landlord, renter: user?.profile,
+        id: null,
+        renter_id: userId,
+        landlord_id: state.landlordId,
+        listing: state.listing,
+        landlord: state.landlord,
+        renter: user?.profile,
       })
-      if (newConvoState.unitName) {
-        const roomPart = newConvoState.roomName ? ` (${newConvoState.roomName})` : ''
-        setNewMessage(`Hi, I'm interested in ${newConvoState.unitName}${roomPart} — is it still available?`)
+      if (state.unitName) {
+        const roomPart = state.roomName
+          ? ` (${state.roomName})`
+          : ''
+        setNewMessage(`Hi, I'm interested in ${state.unitName}${roomPart} — is it still available?`)
       }
       setLoading(false)
       return
     }
     if (userId) fetchConversation()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fetchConversation, id, isNew, navigate, newConvoState, userId])
+  }, [fetchConversation, id, isNew, navigate, userId])
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
 
   useEffect(() => {
-    if (!conversation?.id || isNew) return
+    if (!conversation?.id || isNew || !userId) return
     const fetchTenancy = async () => {
       const { data } = await supabase
         .from('tenancies')
@@ -126,10 +147,16 @@ export default function ConversationPage() {
     fetchTenancy()
   }, [conversation?.id, isNew, userId])
 
+  // Real-time subscription for new messages from the other party.
+  // Depend on userId (primitive) not user (object) so the subscription
+  // doesn't tear down and recreate on every token refresh (B33).
   useEffect(() => {
     if (!id || isNew || !userId) return
-    const channel = supabase.channel(`messages-${id}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${id}` },
+    const channel = supabase
+      .channel(`messages-${id}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${id}` },
         async (payload) => {
           if (payload.new.sender_id === userId) return
           const { data: msg } = await supabase
@@ -145,18 +172,30 @@ export default function ConversationPage() {
             supabase.from('messages').update({ read: true }).eq('id', msg.id)
             const convo = conversationRef.current
             if (convo) {
+              supabase.rpc('reset_unread', { p_conversation_id: convo.id })
               const myUnreadField = userId === convo.renter_id ? 'renter_unread' : 'landlord_unread'
-              supabase.from('conversations').update({ [myUnreadField]: 0 }).eq('id', convo.id)
               setConversation(prev => prev ? { ...prev, [myUnreadField]: 0 } : prev)
             }
           }
-        })
-      .subscribe()
+        }
+      )
+      .subscribe((status) => {
+        // Supabase emits CHANNEL_ERROR / TIMED_OUT when the socket can't
+        // keep up (replication disabled, network partition). Flip to
+        // polling fallback in those cases; keep polling off otherwise (B26).
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          setRealtimeHealthy(false)
+        } else if (status === 'SUBSCRIBED') {
+          setRealtimeHealthy(true)
+        }
+      })
     return () => { supabase.removeChannel(channel) }
   }, [id, isNew, userId])
 
+  // Polling fallback — only runs when realtime reports an unhealthy channel (B26).
+  // Prevents doubling up network traffic when realtime is working fine.
   useEffect(() => {
-    if (!id || isNew || !userId) return
+    if (!id || isNew || !userId || realtimeHealthy) return
     const poll = setInterval(async () => {
       const since = lastMessageAtRef.current
       if (!since) return
@@ -176,7 +215,7 @@ export default function ConversationPage() {
       })
     }, 5000)
     return () => clearInterval(poll)
-  }, [id, isNew, userId])
+  }, [id, isNew, userId, realtimeHealthy])
 
   const handleSend = async (e) => {
     e.preventDefault()
@@ -186,32 +225,25 @@ export default function ConversationPage() {
     setNewMessage('')
     setError(null)
 
+    // New conversation: create conversation + first message + counter bump atomically
+    // via start_conversation_with_message so a failed message insert can't
+    // leave an orphan conversation row behind (B5).
     if (isNew) {
-      const { data: convo, error: convoErr } = await supabase
-        .from('conversations')
-        .insert({
-          listing_id: newConvoState.listingId, renter_id: userId,
-          landlord_id: newConvoState.landlordId,
-          unit_id: newConvoState.unitId || null, room_id: newConvoState.roomId || null,
-        })
-        .select('id').single()
+      const { data: rpcData, error: rpcErr } = await supabase.rpc('start_conversation_with_message', {
+        p_listing_id: newConvoState.listingId,
+        p_landlord_id: newConvoState.landlordId,
+        p_unit_id: newConvoState.unitId || null,
+        p_room_id: newConvoState.roomId || null,
+        p_content: content,
+      })
 
-      if (convoErr) {
-        const { data: existing } = await supabase.from('conversations').select('id')
-          .eq('listing_id', newConvoState.listingId).eq('renter_id', userId).maybeSingle()
-        if (existing) { setSending(false); setNewMessage(content); navigate(`/messages/${existing.id}`, { replace: true }); return }
+      if (rpcErr || !rpcData?.[0]?.conversation_id) {
         setError('Could not start conversation. Please try again.')
         setNewMessage(content); setSending(false); return
       }
 
-      const { error: sendErr } = await supabase.from('messages').insert({ conversation_id: convo.id, sender_id: userId, content })
-      if (sendErr) { setError('Failed to send message.'); setNewMessage(content); setSending(false); return }
-
-      await supabase.from('conversations').update({
-        last_message: content, last_message_at: new Date().toISOString(), landlord_unread: 1,
-      }).eq('id', convo.id)
-
-      navigate(`/messages/${convo.id}`, { replace: true })
+      // Navigate to the real conversation — component remounts and fetches cleanly
+      navigate(`/messages/${rpcData[0].conversation_id}`, { replace: true })
       setSending(false)
       return
     }
@@ -227,16 +259,22 @@ export default function ConversationPage() {
     setMessages(prev => [...prev, msg])
     if (msg) lastMessageAtRef.current = msg.created_at
 
+    // Atomic +1 on the other party's unread counter via RPC (B3).
+    // Two concurrent sends from the same side now compose correctly instead
+    // of both reading a stale count and writing back the same +1.
     const otherUnreadField = userId === conversation.renter_id ? 'landlord_unread' : 'renter_unread'
-    const currentOtherUnread = userId === conversation.renter_id
-      ? (conversation.landlord_unread || 0) : (conversation.renter_unread || 0)
 
     await supabase.from('conversations').update({
-      last_message: content, last_message_at: new Date().toISOString(),
-      [otherUnreadField]: currentOtherUnread + 1,
+      last_message: content,
+      last_message_at: new Date().toISOString(),
     }).eq('id', id)
 
-    setConversation(prev => prev ? { ...prev, [otherUnreadField]: currentOtherUnread + 1 } : prev)
+    await supabase.rpc('bump_unread', { p_conversation_id: id, p_field: otherUnreadField })
+
+    setConversation(prev => prev
+      ? { ...prev, [otherUnreadField]: (prev[otherUnreadField] || 0) + 1 }
+      : prev)
+
     setSending(false)
     inputRef.current?.focus()
   }

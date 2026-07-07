@@ -1,9 +1,16 @@
 import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
 
+const todayLocalISO = () => {
+  const d = new Date()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${m}-${day}`
+}
+
 export default function TenancyBar({ tenancy, onEnded, onAssignClick }) {
   const [confirming, setConfirming] = useState(false)
-  const [moveOut, setMoveOut] = useState(new Date().toISOString().split('T')[0])
+  const [moveOut, setMoveOut] = useState(todayLocalISO())
   const [ending, setEnding] = useState(false)
   const [error, setError] = useState(null)
 
@@ -31,31 +38,16 @@ export default function TenancyBar({ tenancy, onEnded, onAssignClick }) {
     setEnding(true)
     setError(null)
 
-    const windowCloses = new Date(moveOut)
-    windowCloses.setDate(windowCloses.getDate() + 30)
+    const { data: updated, error: rpcErr } = await supabase.rpc('end_tenancy', {
+      p_tenancy_id: tenancy.id,
+      p_move_out: moveOut,
+    })
 
-    // Update tenancy
-    const { error: tenancyErr } = await supabase
-      .from('tenancies')
-      .update({
-        status: 'ended',
-        move_out: moveOut,
-        review_window_closes_at: windowCloses.toISOString(),
-      })
-      .eq('id', tenancy.id)
-
-    if (tenancyErr) { setError(tenancyErr.message); setEnding(false); return }
-
-    // Flip unit/room back to available
-    if (tenancy.room_id) {
-      await supabase.from('listing_unit_rooms').update({ status: 'available' }).eq('id', tenancy.room_id)
-    } else {
-      await supabase.from('listing_units').update({ status: 'available' }).eq('id', tenancy.unit_id)
-    }
+    if (rpcErr) { setError(rpcErr.message); setEnding(false); return }
 
     setEnding(false)
     setConfirming(false)
-    onEnded({ ...tenancy, status: 'ended', move_out: moveOut, review_window_closes_at: windowCloses.toISOString() })
+    onEnded({ ...tenancy, ...updated })
   }
 
   // Active tenancy

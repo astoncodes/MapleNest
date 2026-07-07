@@ -1,11 +1,18 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 
+const todayLocalISO = () => {
+  const d = new Date()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${m}-${day}`
+}
+
 export default function AssignTenantModal({ listingId, renterId, conversationId, onAssigned, onClose }) {
   const [units, setUnits] = useState([])
   const [selectedUnitId, setSelectedUnitId] = useState('')
   const [selectedRoomId, setSelectedRoomId] = useState('')
-  const [moveIn, setMoveIn] = useState(new Date().toISOString().split('T')[0])
+  const [moveIn, setMoveIn] = useState(todayLocalISO())
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
 
@@ -45,49 +52,20 @@ export default function AssignTenantModal({ listingId, renterId, conversationId,
 
     const roomId = selectedUnit?.room_rental ? selectedRoomId : null
 
-    // Get landlord_id from listing
-    const { data: listing } = await supabase
-      .from('listings')
-      .select('landlord_id')
-      .eq('id', listingId)
-      .single()
+    const { data: tenancy, error: rpcErr } = await supabase.rpc('assign_tenant', {
+      p_listing_id: listingId,
+      p_unit_id: selectedUnitId,
+      p_room_id: roomId,
+      p_renter_id: renterId,
+      p_conversation_id: conversationId,
+      p_move_in: moveIn,
+    })
 
-    if (!listing) { setError('Listing not found.'); setSaving(false); return }
-
-    // Insert tenancy
-    const { data: tenancy, error: tenancyErr } = await supabase
-      .from('tenancies')
-      .insert({
-        listing_id: listingId,
-        unit_id: selectedUnitId,
-        room_id: roomId,
-        renter_id: renterId,
-        landlord_id: listing.landlord_id,
-        conversation_id: conversationId,
-        move_in: moveIn,
-        status: 'active',
-      })
-      .select()
-      .single()
-
-    if (tenancyErr) {
-      setError(tenancyErr.code === '23505' ? 'This unit/room already has an active tenant.' : tenancyErr.message)
+    if (rpcErr) {
+      setError(rpcErr.code === '23505' ? 'This unit/room already has an active tenant.' : rpcErr.message)
       setSaving(false)
       return
     }
-
-    // Update unit/room status
-    if (roomId) {
-      await supabase.from('listing_unit_rooms').update({ status: 'occupied' }).eq('id', roomId)
-    } else {
-      await supabase.from('listing_units').update({ status: 'rented' }).eq('id', selectedUnitId)
-    }
-
-    // Update conversation unit/room context
-    await supabase.from('conversations').update({
-      unit_id: selectedUnitId,
-      room_id: roomId,
-    }).eq('id', conversationId)
 
     setSaving(false)
     onAssigned({

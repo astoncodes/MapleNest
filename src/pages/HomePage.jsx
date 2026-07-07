@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
@@ -196,7 +196,7 @@ export default function HomePage() {
       {/* ── Testimonial ── */}
       <section className="border-t border-hairline py-24 px-6 md:px-16">
         <div className="max-w-2xl mx-auto text-center fade-up">
-          <div className="font-serif text-6xl font-normal text-maple leading-none mb-8">"</div>
+          <div className="font-serif text-6xl font-normal text-maple leading-none mb-8">&ldquo;</div>
           <blockquote className="font-serif font-normal italic text-ink leading-relaxed mb-8"
             style={{ fontSize: 'clamp(22px, 3vw, 34px)' }}>
             MapleNest made finding a place in Charlottetown genuinely easy. Felt local, felt safe.
