@@ -119,9 +119,21 @@ CREATE TABLE IF NOT EXISTS public.conversations (
   landlord_unread INTEGER DEFAULT 0,
   unit_id uuid REFERENCES public.listing_units(id) ON DELETE SET NULL,
   room_id uuid REFERENCES public.listing_unit_rooms(id) ON DELETE SET NULL,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(listing_id, renter_id)
+  created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- One conversation per (listing, renter, unit, room) — a renter interested in
+-- two units of the same listing gets two separate threads (B2). The COALESCE
+-- sentinel makes NULL unit/room compare equal so (A,B,NULL,NULL) can't repeat.
+ALTER TABLE public.conversations
+  DROP CONSTRAINT IF EXISTS conversations_listing_id_renter_id_key;
+CREATE UNIQUE INDEX IF NOT EXISTS conversations_listing_renter_unit_room_uidx
+  ON public.conversations (
+    listing_id,
+    renter_id,
+    COALESCE(unit_id, '00000000-0000-0000-0000-000000000000'::uuid),
+    COALESCE(room_id, '00000000-0000-0000-0000-000000000000'::uuid)
+  );
 
 CREATE TABLE IF NOT EXISTS public.messages (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -226,7 +238,10 @@ DROP POLICY IF EXISTS "Landlords can update own listings" ON public.listings;
 DROP POLICY IF EXISTS "Renters can update own subleases" ON public.listings;
 DROP POLICY IF EXISTS "Landlords can delete own listings" ON public.listings;
 CREATE POLICY "Listings are publicly viewable" ON public.listings
-  FOR SELECT USING (status = 'active');
+  FOR SELECT USING (
+    status = 'active'
+    OR auth.uid() = landlord_id
+  );
 CREATE POLICY "Landlords can create listings" ON public.listings
   FOR INSERT WITH CHECK (
     auth.uid() = landlord_id
@@ -376,21 +391,8 @@ CREATE POLICY "Participants can mark messages read" ON public.messages
     )
   );
 
-DROP POLICY IF EXISTS "Reviews are publicly viewable" ON public.reviews;
-DROP POLICY IF EXISTS "Reviewers can see own reviews" ON public.reviews;
-DROP POLICY IF EXISTS "Authenticated users can create reviews" ON public.reviews;
-CREATE POLICY "Reviews are publicly viewable" ON public.reviews
-  FOR SELECT
-  USING (visible = true);
-CREATE POLICY "Reviewers can see own reviews" ON public.reviews
-  FOR SELECT
-  USING (auth.uid() = reviewer_id);
-CREATE POLICY "Authenticated users can create reviews" ON public.reviews
-  FOR INSERT
-  WITH CHECK (
-    auth.uid() = reviewer_id
-    AND reviewer_id <> reviewee_id
-  );
+-- NOTE: reviews RLS policies are declared further down, after the tenancy
+-- section's ALTER TABLE adds the visible / tenancy_id columns they reference.
 
 DROP POLICY IF EXISTS "Authenticated users can submit reports" ON public.reports;
 CREATE POLICY "Authenticated users can submit reports" ON public.reports
@@ -401,20 +403,69 @@ CREATE POLICY "Authenticated users can submit reports" ON public.reports
 -- TRIGGERS
 -- =============================================
 
+-- Whitelist the signup role: raw_user_meta_data is client-controlled, so
+-- anything except 'renter'/'landlord' (e.g. 'admin') falls back to 'renter'.
+-- Admins are promoted manually via SQL only.
 CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_requested_role text;
+  v_safe_role      text;
 BEGIN
+  v_requested_role := lower(trim(COALESCE(new.raw_user_meta_data ->> 'role', '')));
+
+  IF v_requested_role IN ('renter', 'landlord') THEN
+    v_safe_role := v_requested_role;
+  ELSE
+    v_safe_role := 'renter';
+  END IF;
+
   INSERT INTO public.profiles (id, email, role, full_name)
   VALUES (
     new.id,
     new.email,
-    COALESCE(new.raw_user_meta_data ->> 'role', 'renter'),
+    v_safe_role,
     new.raw_user_meta_data ->> 'full_name'
   )
   ON CONFLICT (id) DO NOTHING;
+
   RETURN new;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
+
+-- Only admins may change profiles.role; everyone else's role updates are
+-- silently reverted (pairs with the "Users can update own profile" policy).
+CREATE OR REPLACE FUNCTION public.lock_profile_role()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_caller_role text;
+BEGIN
+  IF NEW.role IS DISTINCT FROM OLD.role THEN
+    SELECT role INTO v_caller_role
+    FROM public.profiles
+    WHERE id = auth.uid();
+
+    IF v_caller_role IS DISTINCT FROM 'admin' THEN
+      NEW.role := OLD.role;
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS profiles_role_lock ON public.profiles;
+CREATE TRIGGER profiles_role_lock
+  BEFORE UPDATE ON public.profiles
+  FOR EACH ROW
+  EXECUTE FUNCTION public.lock_profile_role();
 
 CREATE OR REPLACE FUNCTION public.handle_updated_at()
 RETURNS TRIGGER AS $$
@@ -460,8 +511,16 @@ $$;
 GRANT EXECUTE ON FUNCTION public.increment_views(uuid) TO authenticated, anon;
 
 -- =============================================
--- STORAGE POLICIES
+-- STORAGE BUCKETS & POLICIES
 -- =============================================
+
+-- Create both buckets idempotently so a fresh project needs no manual
+-- dashboard step. Both are public-read; writes are policy-scoped below.
+INSERT INTO storage.buckets (id, name, public)
+VALUES
+  ('listing-images', 'listing-images', true),
+  ('avatars', 'avatars', true)
+ON CONFLICT (id) DO UPDATE SET public = EXCLUDED.public;
 
 DROP POLICY IF EXISTS "Listing images are publicly readable" ON storage.objects;
 DROP POLICY IF EXISTS "Users can upload own listing images" ON storage.objects;
@@ -500,29 +559,40 @@ CREATE POLICY "Users can delete own listing images" ON storage.objects
     AND name LIKE auth.uid()::text || '/%'
   );
 
-CREATE POLICY "Users can upload own avatars" ON storage.objects
+-- Avatars live in their own bucket under {user_id}/{filename} (B12).
+-- The old flat-path avatar policies on listing-images are retired.
+DROP POLICY IF EXISTS "Avatars are publicly readable" ON storage.objects;
+DROP POLICY IF EXISTS "Users can upload own avatar" ON storage.objects;
+DROP POLICY IF EXISTS "Users can update own avatar" ON storage.objects;
+DROP POLICY IF EXISTS "Users can delete own avatar" ON storage.objects;
+
+CREATE POLICY "Avatars are publicly readable" ON storage.objects
+  FOR SELECT
+  USING (bucket_id = 'avatars');
+
+CREATE POLICY "Users can upload own avatar" ON storage.objects
   FOR INSERT
   WITH CHECK (
-    bucket_id = 'listing-images'
-    AND name LIKE 'avatars/' || auth.uid()::text || '.%'
+    bucket_id = 'avatars'
+    AND name LIKE auth.uid()::text || '/%'
   );
 
-CREATE POLICY "Users can update own avatars" ON storage.objects
+CREATE POLICY "Users can update own avatar" ON storage.objects
   FOR UPDATE
   USING (
-    bucket_id = 'listing-images'
-    AND name LIKE 'avatars/' || auth.uid()::text || '.%'
+    bucket_id = 'avatars'
+    AND name LIKE auth.uid()::text || '/%'
   )
   WITH CHECK (
-    bucket_id = 'listing-images'
-    AND name LIKE 'avatars/' || auth.uid()::text || '.%'
+    bucket_id = 'avatars'
+    AND name LIKE auth.uid()::text || '/%'
   );
 
-CREATE POLICY "Users can delete own avatars" ON storage.objects
+CREATE POLICY "Users can delete own avatar" ON storage.objects
   FOR DELETE
   USING (
-    bucket_id = 'listing-images'
-    AND name LIKE 'avatars/' || auth.uid()::text || '.%'
+    bucket_id = 'avatars'
+    AND name LIKE auth.uid()::text || '/%'
   );
 
 -- =============================================
@@ -614,6 +684,39 @@ ALTER TABLE public.reviews
 CREATE UNIQUE INDEX IF NOT EXISTS reviews_tenancy_reviewer_idx
   ON public.reviews (tenancy_id, reviewer_id)
   WHERE tenancy_id IS NOT NULL;
+
+-- ── reviews RLS ──────────────────────────────────────────────────────────────
+-- Declared here (not with the other RLS blocks) because these policies
+-- reference the visible / tenancy_id columns added just above.
+DROP POLICY IF EXISTS "Reviews are publicly viewable" ON public.reviews;
+DROP POLICY IF EXISTS "Reviewers can see own reviews" ON public.reviews;
+DROP POLICY IF EXISTS "Authenticated users can create reviews" ON public.reviews;
+CREATE POLICY "Reviews are publicly viewable" ON public.reviews
+  FOR SELECT
+  USING (visible = true);
+CREATE POLICY "Reviewers can see own reviews" ON public.reviews
+  FOR SELECT
+  USING (auth.uid() = reviewer_id);
+-- Reviews require an actual tenancy between the two parties with an open
+-- review window; reviewer must be one side and reviewee the other (B23).
+CREATE POLICY "Authenticated users can create reviews" ON public.reviews
+  FOR INSERT
+  WITH CHECK (
+    auth.uid() = reviewer_id
+    AND reviewer_id <> reviewee_id
+    AND tenancy_id IS NOT NULL
+    AND EXISTS (
+      SELECT 1
+      FROM public.tenancies t
+      WHERE t.id = tenancy_id
+        AND t.review_window_closes_at IS NOT NULL
+        AND t.review_window_closes_at > now()
+        AND (
+          (t.renter_id   = auth.uid() AND t.landlord_id = reviewee_id) OR
+          (t.landlord_id = auth.uid() AND t.renter_id   = reviewee_id)
+        )
+    )
+  );
 
 -- ── tenancy functions ────────────────────────────────────────────────────────
 
@@ -716,3 +819,289 @@ CREATE INDEX IF NOT EXISTS idx_tenancies_unit_id_active ON public.tenancies (uni
 CREATE INDEX IF NOT EXISTS idx_tenancies_renter_id ON public.tenancies (renter_id);
 CREATE INDEX IF NOT EXISTS idx_tenancies_landlord_id ON public.tenancies (landlord_id);
 CREATE INDEX IF NOT EXISTS idx_tenancies_conversation_id ON public.tenancies (conversation_id);
+
+-- =============================================
+-- MESSAGING RPCs (atomic counters + conversation start)
+-- =============================================
+
+-- Atomic +1 on the *other* party's unread counter (B3). Participants only.
+CREATE OR REPLACE FUNCTION public.bump_unread(p_conversation_id uuid, p_field text)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_convo record;
+BEGIN
+  IF p_field NOT IN ('renter_unread', 'landlord_unread') THEN
+    RAISE EXCEPTION 'invalid field %', p_field;
+  END IF;
+
+  SELECT renter_id, landlord_id INTO v_convo
+  FROM conversations WHERE id = p_conversation_id;
+  IF NOT FOUND THEN RETURN; END IF;
+
+  IF auth.uid() IS DISTINCT FROM v_convo.renter_id
+     AND auth.uid() IS DISTINCT FROM v_convo.landlord_id THEN
+    RAISE EXCEPTION 'not a conversation participant';
+  END IF;
+
+  IF p_field = 'renter_unread' THEN
+    UPDATE conversations
+      SET renter_unread = COALESCE(renter_unread, 0) + 1
+      WHERE id = p_conversation_id;
+  ELSE
+    UPDATE conversations
+      SET landlord_unread = COALESCE(landlord_unread, 0) + 1
+      WHERE id = p_conversation_id;
+  END IF;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.bump_unread(uuid, text) TO authenticated;
+
+-- Atomic zero of the caller's own unread counter (B3).
+CREATE OR REPLACE FUNCTION public.reset_unread(p_conversation_id uuid)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_convo record;
+BEGIN
+  SELECT renter_id, landlord_id INTO v_convo
+  FROM conversations WHERE id = p_conversation_id;
+  IF NOT FOUND THEN RETURN; END IF;
+
+  IF auth.uid() = v_convo.renter_id THEN
+    UPDATE conversations SET renter_unread = 0 WHERE id = p_conversation_id;
+  ELSIF auth.uid() = v_convo.landlord_id THEN
+    UPDATE conversations SET landlord_unread = 0 WHERE id = p_conversation_id;
+  ELSE
+    RAISE EXCEPTION 'not a conversation participant';
+  END IF;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.reset_unread(uuid) TO authenticated;
+
+-- Create-or-resume a conversation per (listing, renter, unit, room) and
+-- insert the first message atomically (B5 + B2).
+CREATE OR REPLACE FUNCTION public.start_conversation_with_message(
+  p_listing_id uuid,
+  p_landlord_id uuid,
+  p_unit_id uuid,
+  p_room_id uuid,
+  p_content text
+)
+RETURNS TABLE (conversation_id uuid, created boolean)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_renter_id uuid := auth.uid();
+  v_convo_id uuid;
+  v_created boolean := false;
+BEGIN
+  IF v_renter_id IS NULL THEN
+    RAISE EXCEPTION 'must be authenticated';
+  END IF;
+
+  IF length(coalesce(trim(p_content), '')) = 0 THEN
+    RAISE EXCEPTION 'message content required';
+  END IF;
+
+  SELECT id INTO v_convo_id
+  FROM conversations
+  WHERE listing_id = p_listing_id
+    AND renter_id  = v_renter_id
+    AND unit_id IS NOT DISTINCT FROM p_unit_id
+    AND room_id IS NOT DISTINCT FROM p_room_id;
+
+  IF v_convo_id IS NULL THEN
+    INSERT INTO conversations (listing_id, renter_id, landlord_id, unit_id, room_id)
+    VALUES (p_listing_id, v_renter_id, p_landlord_id, p_unit_id, p_room_id)
+    RETURNING id INTO v_convo_id;
+    v_created := true;
+  END IF;
+
+  INSERT INTO messages (conversation_id, sender_id, content)
+  VALUES (v_convo_id, v_renter_id, p_content);
+
+  UPDATE conversations
+    SET last_message = p_content,
+        last_message_at = now(),
+        landlord_unread = COALESCE(landlord_unread, 0) + 1
+    WHERE id = v_convo_id;
+
+  conversation_id := v_convo_id;
+  created := v_created;
+  RETURN NEXT;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.start_conversation_with_message(uuid, uuid, uuid, uuid, text)
+  TO authenticated;
+
+-- Cheap total for the navbar unread badge (B10).
+CREATE OR REPLACE FUNCTION public.user_unread_total()
+RETURNS integer
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT COALESCE(
+    (SELECT SUM(renter_unread)   FROM conversations WHERE renter_id   = auth.uid()), 0
+  )::int +
+  COALESCE(
+    (SELECT SUM(landlord_unread) FROM conversations WHERE landlord_id = auth.uid()), 0
+  )::int;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.user_unread_total() TO authenticated;
+
+-- =============================================
+-- TENANCY RPCs (atomic assign / end)
+-- =============================================
+
+-- assign_tenant: insert tenancy + flip unit/room status + stamp conversation (B6).
+CREATE OR REPLACE FUNCTION public.assign_tenant(
+  p_listing_id uuid,
+  p_unit_id uuid,
+  p_room_id uuid,
+  p_renter_id uuid,
+  p_conversation_id uuid,
+  p_move_in date
+)
+RETURNS public.tenancies
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_caller uuid := auth.uid();
+  v_landlord uuid;
+  v_room_rental boolean;
+  v_tenancy public.tenancies;
+BEGIN
+  IF v_caller IS NULL THEN
+    RAISE EXCEPTION 'must be authenticated';
+  END IF;
+
+  SELECT landlord_id INTO v_landlord
+  FROM listings WHERE id = p_listing_id;
+
+  IF v_landlord IS NULL THEN
+    RAISE EXCEPTION 'listing not found';
+  END IF;
+
+  IF v_landlord <> v_caller THEN
+    RAISE EXCEPTION 'only the listing owner can assign tenants';
+  END IF;
+
+  SELECT room_rental INTO v_room_rental
+  FROM listing_units
+  WHERE id = p_unit_id AND listing_id = p_listing_id;
+
+  IF v_room_rental IS NULL THEN
+    RAISE EXCEPTION 'unit not found for listing';
+  END IF;
+
+  IF v_room_rental AND p_room_id IS NULL THEN
+    RAISE EXCEPTION 'room_id required for room-rental unit';
+  END IF;
+
+  IF NOT v_room_rental AND p_room_id IS NOT NULL THEN
+    RAISE EXCEPTION 'room_id must be null for whole-unit rentals';
+  END IF;
+
+  IF p_room_id IS NOT NULL THEN
+    PERFORM 1 FROM listing_unit_rooms WHERE id = p_room_id AND unit_id = p_unit_id;
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'room not found for unit';
+    END IF;
+  END IF;
+
+  INSERT INTO tenancies (
+    listing_id, unit_id, room_id, renter_id, landlord_id,
+    conversation_id, move_in, status
+  )
+  VALUES (
+    p_listing_id, p_unit_id, p_room_id, p_renter_id, v_landlord,
+    p_conversation_id, p_move_in, 'active'
+  )
+  RETURNING * INTO v_tenancy;
+
+  IF p_room_id IS NOT NULL THEN
+    UPDATE listing_unit_rooms SET status = 'occupied' WHERE id = p_room_id;
+  ELSE
+    UPDATE listing_units SET status = 'rented' WHERE id = p_unit_id;
+  END IF;
+
+  IF p_conversation_id IS NOT NULL THEN
+    UPDATE conversations
+      SET unit_id = p_unit_id, room_id = p_room_id
+      WHERE id = p_conversation_id AND landlord_id = v_caller;
+  END IF;
+
+  RETURN v_tenancy;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.assign_tenant(uuid, uuid, uuid, uuid, uuid, date)
+  TO authenticated;
+
+-- end_tenancy: mark ended + open review window + free the unit/room (B7).
+CREATE OR REPLACE FUNCTION public.end_tenancy(
+  p_tenancy_id uuid,
+  p_move_out date
+)
+RETURNS public.tenancies
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_caller uuid := auth.uid();
+  v_tenancy public.tenancies;
+BEGIN
+  IF v_caller IS NULL THEN
+    RAISE EXCEPTION 'must be authenticated';
+  END IF;
+
+  SELECT * INTO v_tenancy FROM tenancies WHERE id = p_tenancy_id FOR UPDATE;
+
+  IF v_tenancy.id IS NULL THEN
+    RAISE EXCEPTION 'tenancy not found';
+  END IF;
+
+  IF v_tenancy.landlord_id <> v_caller THEN
+    RAISE EXCEPTION 'only the landlord can end a tenancy';
+  END IF;
+
+  IF v_tenancy.status <> 'active' THEN
+    RAISE EXCEPTION 'tenancy is not active';
+  END IF;
+
+  UPDATE tenancies
+    SET status = 'ended',
+        move_out = p_move_out,
+        review_window_closes_at = (p_move_out + INTERVAL '30 days')::timestamptz
+    WHERE id = p_tenancy_id
+    RETURNING * INTO v_tenancy;
+
+  IF v_tenancy.room_id IS NOT NULL THEN
+    UPDATE listing_unit_rooms SET status = 'available' WHERE id = v_tenancy.room_id;
+  ELSE
+    UPDATE listing_units SET status = 'available' WHERE id = v_tenancy.unit_id;
+  END IF;
+
+  RETURN v_tenancy;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.end_tenancy(uuid, date) TO authenticated;
