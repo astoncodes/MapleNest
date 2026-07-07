@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './hooks/useAuth'
 import { supabaseConfigError } from './lib/supabase'
+import ErrorBoundary from './components/shared/ErrorBoundary'
 import Navbar from './components/shared/Navbar'
 import HomePage from './pages/HomePage'
 import LoginPage from './pages/LoginPage'
@@ -81,8 +82,10 @@ export default function App() {
   }
 
   return (
-    <AuthProvider>
-      <AppRoutes />
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <AppRoutes />
+      </AuthProvider>
+    </ErrorBoundary>
   )
 }
