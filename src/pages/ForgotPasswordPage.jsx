@@ -30,17 +30,17 @@ export default function ForgotPasswordPage() {
 
   if (sent) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4">
+      <div className="min-h-screen bg-canvas flex items-center justify-center px-4">
         <div className="text-center max-w-sm">
-          <div className="text-5xl mb-4">📬</div>
-          <h2 className="text-xl font-bold text-gray-800 mb-2">Check your email</h2>
-          <p className="text-gray-500 text-sm mb-6">
-            We sent a password reset link to <strong>{email}</strong>. 
+          <div className="text-5xl mb-6">📬</div>
+          <h2 className="font-serif font-light text-3xl text-ink mb-3">Check your email</h2>
+          <p className="text-sm text-steel leading-relaxed mb-4">
+            We sent a password reset link to <strong className="text-charcoal font-medium">{email}</strong>.
             Click the link in the email to set a new password.
           </p>
-          <p className="text-xs text-gray-400 mb-4">Didn&apos;t get it? Check your spam folder.</p>
+          <p className="text-xs text-stone mb-6">Didn&apos;t get it? Check your spam folder.</p>
           <button onClick={() => setSent(false)}
-            className="text-red-700 text-sm font-medium hover:underline">
+            className="text-[11px] tracking-widest uppercase text-maple hover:text-maple-dark transition-colors">
             Try a different email
           </button>
         </div>
@@ -49,48 +49,49 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <span className="text-4xl">🍁</span>
-          <h1 className="text-2xl font-bold text-gray-800 mt-2">Forgot your password?</h1>
-          <p className="text-gray-500 text-sm mt-1">
+    <div className="min-h-screen bg-canvas flex items-center justify-center px-4">
+      <div className="w-full max-w-sm">
+        <div className="text-center mb-10">
+          <Link to="/" className="font-serif text-lg tracking-widest uppercase text-ink">
+            Maple<span className="text-maple">·</span>Nest
+          </Link>
+          <h1 className="font-serif font-light text-3xl text-ink mt-5 mb-2">Forgot your password?</h1>
+          <p className="text-sm text-steel">
             Enter your email and we&apos;ll send you a reset link
           </p>
         </div>
 
-        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+        <form onSubmit={handleSubmit} className="space-y-6">
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg mb-4">
+            <div className="bg-maple-light border border-maple-muted text-maple-dark text-sm px-4 py-3" role="alert">
               {error}
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email address</label>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
-              />
-            </div>
+          <div className="space-y-1">
+            <label className="block text-[10px] tracking-widest uppercase text-stone">Email address</label>
+            <input
+              type="email"
+              required
+              autoComplete="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              className="w-full bg-transparent border-b border-hairline py-3 text-sm text-charcoal placeholder:text-stone focus:outline-none focus:border-maple transition-colors font-light"
+            />
+          </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-red-700 text-white py-2.5 rounded-lg font-semibold text-sm hover:bg-red-800 transition disabled:opacity-50">
-              {loading ? 'Sending...' : 'Send Reset Link'}
-            </button>
-          </form>
-        </div>
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-ink text-canvas text-[11px] tracking-widest uppercase py-4 hover:bg-maple transition-colors duration-200 disabled:opacity-40 mt-2">
+            {loading ? 'Sending...' : 'Send Reset Link'}
+          </button>
+        </form>
 
-        <p className="text-center text-sm text-gray-500 mt-4">
+        <p className="text-center text-xs text-steel mt-6 pt-6 border-t border-hairline">
           Remember your password?{' '}
-          <Link to="/login" className="text-red-700 font-medium hover:underline">Sign in</Link>
+          <Link to="/login" className="text-maple hover:text-maple-dark transition-colors">Sign in</Link>
         </p>
       </div>
     </div>
