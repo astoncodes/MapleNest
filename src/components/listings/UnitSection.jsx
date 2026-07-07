@@ -14,30 +14,30 @@ function UnitRow({ unit, basePrice, baseDate, onRequest = () => {}, isOwn }) {
 
   return (
     <div className={`flex items-center justify-between gap-4 py-3 px-4 rounded-lg border ${
-      isRented ? 'bg-gray-50 border-gray-100 opacity-60' : 'bg-white border-gray-100'
+      isRented ? 'bg-surface border-hairline-soft opacity-60' : 'bg-canvas border-hairline-soft'
     }`}>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-semibold text-sm text-gray-900">{unit.unit_name}</span>
+          <span className="font-semibold text-sm text-ink">{unit.unit_name}</span>
           {unit.floor != null && (
-            <span className="text-xs text-gray-500">Floor {unit.floor}</span>
+            <span className="text-xs text-steel">Floor {unit.floor}</span>
           )}
           {date && !isRented && (
-            <span className="text-xs text-gray-500">· Available {formatDate(date)}</span>
+            <span className="text-xs text-steel">· Available {formatDate(date)}</span>
           )}
         </div>
         {unit.notes && (
-          <p className="text-xs text-gray-400 mt-0.5 truncate">{unit.notes}</p>
+          <p className="text-xs text-stone mt-0.5 truncate">{unit.notes}</p>
         )}
       </div>
       <div className="flex items-center gap-3 flex-shrink-0">
-        <span className="font-bold text-sm text-red-700">{formatPrice(price)}<span className="text-gray-400 font-normal text-xs">/mo</span></span>
+        <span className="font-bold text-sm text-maple-dark">{formatPrice(price)}<span className="text-stone font-normal text-xs">/mo</span></span>
         {isRented ? (
-          <span className="text-xs text-gray-400 font-medium">Rented</span>
+          <span className="text-xs text-stone font-medium">Rented</span>
         ) : isOwn ? null : (
           <button
             onClick={() => onRequest({ unitId: unit.id, unitName: unit.unit_name })}
-            className="bg-red-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-red-800 transition"
+            className="bg-maple text-white text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-maple-dark transition"
           >
             Request
           </button>
@@ -54,24 +54,24 @@ function RoomRow({ room, unitPrice, basePrice, baseDate, unitId, unitName, onReq
 
   return (
     <div className={`flex items-center justify-between gap-4 py-2.5 px-4 ml-4 rounded-lg border ${
-      isOccupied ? 'bg-gray-50 border-gray-100 opacity-60' : 'bg-white border-gray-100'
+      isOccupied ? 'bg-surface border-hairline-soft opacity-60' : 'bg-canvas border-hairline-soft'
     }`}>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-medium text-sm text-gray-800">{room.room_name}</span>
+          <span className="font-medium text-sm text-ink">{room.room_name}</span>
           {date && !isOccupied && (
-            <span className="text-xs text-gray-500">· Available {formatDate(date)}</span>
+            <span className="text-xs text-steel">· Available {formatDate(date)}</span>
           )}
         </div>
       </div>
       <div className="flex items-center gap-3 flex-shrink-0">
-        <span className="font-bold text-sm text-red-700">{formatPrice(price)}<span className="text-gray-400 font-normal text-xs">/mo</span></span>
+        <span className="font-bold text-sm text-maple-dark">{formatPrice(price)}<span className="text-stone font-normal text-xs">/mo</span></span>
         {isOccupied ? (
-          <span className="text-xs text-gray-400 font-medium">Occupied</span>
+          <span className="text-xs text-stone font-medium">Occupied</span>
         ) : isOwn ? null : (
           <button
             onClick={() => onRequest({ unitId, unitName, roomId: room.id, roomName: room.room_name })}
-            className="bg-red-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-red-800 transition"
+            className="bg-maple text-white text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-maple-dark transition"
           >
             Request
           </button>
@@ -91,21 +91,21 @@ function RoomRentalUnit({ unit, basePrice, baseDate, onRequest = () => {}, isOwn
     <div className="space-y-1">
       <button
         onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between gap-4 py-3 px-4 rounded-lg border border-gray-100 bg-gray-50 hover:bg-gray-100 transition text-left"
+        className="w-full flex items-center justify-between gap-4 py-3 px-4 rounded-lg border border-hairline-soft bg-surface hover:bg-surface transition text-left"
       >
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-semibold text-sm text-gray-900">{unit.unit_name}</span>
-          {unit.floor != null && <span className="text-xs text-gray-500">Floor {unit.floor}</span>}
-          <span className="text-xs text-gray-500">
+          <span className="font-semibold text-sm text-ink">{unit.unit_name}</span>
+          {unit.floor != null && <span className="text-xs text-steel">Floor {unit.floor}</span>}
+          <span className="text-xs text-steel">
             · {availableCount} of {totalCount} room{totalCount !== 1 ? 's' : ''} available
           </span>
         </div>
-        <span className="text-gray-400 text-xs">{open ? '▾' : '▸'}</span>
+        <span className="text-stone text-xs">{open ? '▾' : '▸'}</span>
       </button>
       {open && (
         <div className="space-y-1">
           {totalCount === 0 && (
-            <p className="text-xs text-gray-400 ml-4 py-2">No rooms added yet.</p>
+            <p className="text-xs text-stone ml-4 py-2">No rooms added yet.</p>
           )}
           {rooms.map(room => (
             <RoomRow
@@ -148,11 +148,11 @@ export default function UnitSection({ units, basePrice, baseDate, onRequest = ()
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
-        <h2 className="font-semibold text-gray-800 text-lg">
-          Available Units <span className="text-gray-400 font-normal text-base">({availableCount})</span>
+        <h2 className="font-semibold text-ink text-lg">
+          Available Units <span className="text-stone font-normal text-base">({availableCount})</span>
         </h2>
         {isOwn && (
-          <Link to={`/listings/${listingId}/edit`} className="text-xs text-red-700 font-medium hover:underline">
+          <Link to={`/listings/${listingId}/edit`} className="text-xs text-maple-dark font-medium hover:underline">
             Edit units
           </Link>
         )}

@@ -86,30 +86,30 @@ export default function AssignTenantModal({ listingId, renterId, conversationId,
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
       <div
-        className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6"
+        className="bg-canvas rounded-xl shadow-xl w-full max-w-md mx-4 p-6"
         role="dialog"
         aria-modal="true"
         aria-labelledby="assign-tenant-title"
         onClick={e => e.stopPropagation()}
       >
-        <h2 id="assign-tenant-title" className="text-lg font-semibold text-gray-900 mb-4">Assign Tenant to Unit</h2>
+        <h2 id="assign-tenant-title" className="text-lg font-semibold text-ink mb-4">Assign Tenant to Unit</h2>
 
         {availableUnits.length === 0 ? (
           <div className="text-center py-6">
-            <p className="text-sm text-gray-500">No available units on this listing.</p>
+            <p className="text-sm text-steel">No available units on this listing.</p>
             <button type="button" onClick={onClose}
-              className="mt-4 text-sm text-gray-500 hover:text-gray-700">
+              className="mt-4 text-sm text-steel hover:text-charcoal">
               Close
             </button>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Unit</label>
+              <label className="block text-xs font-medium text-steel mb-1">Unit</label>
               <select
                 value={selectedUnitId}
                 onChange={e => { setSelectedUnitId(e.target.value); setSelectedRoomId('') }}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
+                className="w-full border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-maple/30"
                 required
               >
                 <option value="">Select a unit...</option>
@@ -121,11 +121,11 @@ export default function AssignTenantModal({ listingId, renterId, conversationId,
 
             {selectedUnit?.room_rental && (
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Room</label>
+                <label className="block text-xs font-medium text-steel mb-1">Room</label>
                 <select
                   value={selectedRoomId}
                   onChange={e => setSelectedRoomId(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
+                  className="w-full border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-maple/30"
                   required
                 >
                   <option value="">Select a room...</option>
@@ -137,25 +137,25 @@ export default function AssignTenantModal({ listingId, renterId, conversationId,
             )}
 
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Move-in date</label>
+              <label className="block text-xs font-medium text-steel mb-1">Move-in date</label>
               <input
                 type="date"
                 value={moveIn}
                 onChange={e => setMoveIn(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
+                className="w-full border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-maple/30"
                 required
               />
             </div>
 
-            {error && <p className="text-xs text-red-600">{error}</p>}
+            {error && <p className="text-xs text-maple-dark">{error}</p>}
 
             <div className="flex gap-2 justify-end pt-2">
               <button type="button" onClick={onClose}
-                className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">
+                className="px-4 py-2 text-sm text-steel hover:text-charcoal">
                 Cancel
               </button>
               <button type="submit" disabled={saving || !selectedUnitId}
-                className="px-5 py-2 bg-red-700 text-white text-sm font-medium rounded-lg hover:bg-red-800 transition disabled:opacity-50">
+                className="px-5 py-2 bg-maple text-white text-sm font-medium rounded-lg hover:bg-maple-dark transition disabled:opacity-50">
                 {saving ? 'Assigning...' : 'Assign Tenant'}
               </button>
             </div>

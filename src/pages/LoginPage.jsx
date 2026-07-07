@@ -51,7 +51,7 @@ export default function LoginPage() {
           <div className="space-y-1">
             <label className="block text-[10px] tracking-widest uppercase text-stone">Email</label>
             <input
-              type="email" required value={email} onChange={e => setEmail(e.target.value)}
+              type="email" required autoComplete="email" value={email} onChange={e => setEmail(e.target.value)}
               className="w-full bg-transparent border-b border-hairline py-3 text-sm text-charcoal placeholder:text-stone focus:outline-none focus:border-maple transition-colors font-light"
               placeholder="you@example.com"
             />
@@ -60,7 +60,7 @@ export default function LoginPage() {
           <div className="space-y-1">
             <label className="block text-[10px] tracking-widest uppercase text-stone">Password</label>
             <input
-              type="password" required value={password} onChange={e => setPassword(e.target.value)}
+              type="password" required autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)}
               className="w-full bg-transparent border-b border-hairline py-3 text-sm text-charcoal placeholder:text-stone focus:outline-none focus:border-maple transition-colors font-light"
               placeholder="••••••••"
             />

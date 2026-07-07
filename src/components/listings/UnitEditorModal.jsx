@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 
-const inputClass = "w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
-const labelClass = "block text-xs font-medium text-gray-500 mb-1"
+const inputClass = "w-full border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-maple/30"
+const labelClass = "block text-xs font-medium text-steel mb-1"
 
 function RoomEditor({ unitId, basePricePlaceholder }) {
   const [rooms, setRooms] = useState([])
@@ -77,25 +77,25 @@ function RoomEditor({ unitId, basePricePlaceholder }) {
   }
 
   return (
-    <div className="mt-4 border-t border-gray-100 pt-4">
-      <p className="text-xs font-semibold text-gray-700 mb-3">Rooms</p>
+    <div className="mt-4 border-t border-hairline-soft pt-4">
+      <p className="text-xs font-semibold text-charcoal mb-3">Rooms</p>
       <div className="space-y-2 mb-3">
         {rooms.map(room => (
-          <div key={room.id} className={`flex items-center justify-between gap-2 p-2 rounded-lg border text-xs ${room.status === 'occupied' ? 'bg-gray-50 border-gray-100' : 'bg-white border-gray-200'}`}>
-            <span className="font-medium text-gray-800">{room.room_name}</span>
-            {room.price && <span className="text-gray-500">${room.price}/mo</span>}
+          <div key={room.id} className={`flex items-center justify-between gap-2 p-2 rounded-lg border text-xs ${room.status === 'occupied' ? 'bg-surface border-hairline-soft' : 'bg-canvas border-hairline'}`}>
+            <span className="font-medium text-ink">{room.room_name}</span>
+            {room.price && <span className="text-steel">${room.price}/mo</span>}
             <div className="flex items-center gap-2 ml-auto">
-              <button onClick={() => handleToggleOccupied(room)} className={`text-xs px-2 py-0.5 rounded-full font-medium ${room.status === 'occupied' ? 'bg-gray-200 text-gray-600' : 'bg-green-100 text-green-700'}`}>
+              <button onClick={() => handleToggleOccupied(room)} className={`text-xs px-2 py-0.5 rounded-full font-medium ${room.status === 'occupied' ? 'bg-hairline text-steel' : 'bg-maple-light text-maple-dark'}`}>
                 {room.status === 'occupied' ? 'Occupied' : 'Available'}
               </button>
-              <button onClick={() => startEdit(room)} className="text-red-700 font-medium">Edit</button>
-              <button onClick={() => handleDelete(room.id, room.status)} disabled={room.status === 'occupied'} className="text-gray-400 disabled:opacity-40">✕</button>
+              <button onClick={() => startEdit(room)} className="text-maple-dark font-medium">Edit</button>
+              <button onClick={() => handleDelete(room.id, room.status)} disabled={room.status === 'occupied'} className="text-stone disabled:opacity-40">✕</button>
             </div>
           </div>
         ))}
       </div>
-      <div className="space-y-2 bg-gray-50 rounded-lg p-3">
-        <p className="text-xs font-medium text-gray-600">{editingId ? 'Edit room' : 'Add room'}</p>
+      <div className="space-y-2 bg-surface rounded-lg p-3">
+        <p className="text-xs font-medium text-steel">{editingId ? 'Edit room' : 'Add room'}</p>
         <input className={inputClass} placeholder="Room name e.g. Master, Room 1" maxLength={60}
           value={form.room_name} onChange={e => setForm(p => ({ ...p, room_name: e.target.value }))} />
         <div className="grid grid-cols-2 gap-2">
@@ -106,11 +106,11 @@ function RoomEditor({ unitId, basePricePlaceholder }) {
         </div>
         <div className="flex gap-2">
           <button onClick={handleSave} disabled={saving || !form.room_name.trim()}
-            className="bg-red-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-red-800 transition disabled:opacity-50">
+            className="bg-maple text-white text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-maple-dark transition disabled:opacity-50">
             {saving ? 'Saving...' : editingId ? 'Update room' : 'Add room'}
           </button>
           {editingId && (
-            <button onClick={resetForm} className="text-xs text-gray-500 hover:text-gray-700">Cancel</button>
+            <button onClick={resetForm} className="text-xs text-steel hover:text-charcoal">Cancel</button>
           )}
         </div>
       </div>
@@ -190,10 +190,10 @@ export default function UnitEditorModal({ listingId, basePrice, unit, onSaved, o
         role="dialog"
         aria-modal="true"
         aria-labelledby="unit-modal-title"
-        className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto"
+        className="bg-canvas rounded-xl shadow-xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
-        <h3 id="unit-modal-title" className="font-semibold text-gray-900 mb-4">
+        <h3 id="unit-modal-title" className="font-semibold text-ink mb-4">
           {savedUnit ? 'Edit Unit' : 'Add Unit'}
         </h3>
 
@@ -210,7 +210,7 @@ export default function UnitEditorModal({ listingId, basePrice, unit, onSaved, o
               {[{ val: false, label: 'Whole unit' }, { val: true, label: 'Individual rooms' }].map(opt => (
                 <button key={String(opt.val)} type="button"
                   onClick={() => setForm(p => ({ ...p, room_rental: opt.val }))}
-                  className={`flex-1 py-2 rounded-lg border text-sm font-medium transition ${form.room_rental === opt.val ? 'bg-red-700 text-white border-red-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
+                  className={`flex-1 py-2 rounded-lg border text-sm font-medium transition ${form.room_rental === opt.val ? 'bg-maple text-white border-red-700' : 'border-hairline text-steel hover:bg-surface'}`}>
                   {opt.label}
                 </button>
               ))}
@@ -243,24 +243,24 @@ export default function UnitEditorModal({ listingId, basePrice, unit, onSaved, o
           </div>
 
           {savedUnit && !form.room_rental && (
-            <div className="flex items-center justify-between py-2 border-t border-gray-100">
-              <span className="text-sm text-gray-600">Mark as rented</span>
+            <div className="flex items-center justify-between py-2 border-t border-hairline-soft">
+              <span className="text-sm text-steel">Mark as rented</span>
               <button onClick={handleToggleRented}
-                className={`w-10 h-6 rounded-full transition-colors ${savedUnit.status === 'rented' ? 'bg-red-700' : 'bg-gray-200'}`}>
-                <span className={`block w-4 h-4 bg-white rounded-full shadow transform transition-transform mx-1 ${savedUnit.status === 'rented' ? 'translate-x-4' : ''}`} />
+                className={`w-10 h-6 rounded-full transition-colors ${savedUnit.status === 'rented' ? 'bg-maple' : 'bg-hairline'}`}>
+                <span className={`block w-4 h-4 bg-canvas rounded-full shadow transform transition-transform mx-1 ${savedUnit.status === 'rented' ? 'translate-x-4' : ''}`} />
               </button>
             </div>
           )}
 
-          {error && <p className="text-xs text-red-600">{error}</p>}
+          {error && <p className="text-xs text-maple-dark">{error}</p>}
 
           <div className="flex gap-2 pt-1">
             <button onClick={handleSave} disabled={saving}
-              className="flex-1 bg-red-700 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-red-800 transition disabled:opacity-50">
+              className="flex-1 bg-maple text-white py-2.5 rounded-lg text-sm font-medium hover:bg-maple-dark transition disabled:opacity-50">
               {saving ? 'Saving...' : savedUnit ? 'Update unit' : 'Save unit'}
             </button>
             <button onClick={() => { if (savedUnit && form.room_rental) onSaved(savedUnit); onClose() }}
-              className="flex-1 border border-gray-200 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-50 transition">
+              className="flex-1 border border-hairline py-2.5 rounded-lg text-sm font-medium hover:bg-surface transition">
               {savedUnit && form.room_rental ? 'Done' : 'Cancel'}
             </button>
           </div>

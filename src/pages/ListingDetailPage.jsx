@@ -36,8 +36,8 @@ function PhotoSlideshow({ images }) {
 
   if (!images || images.length === 0) {
     return (
-      <div className="aspect-video bg-gray-100 rounded-xl flex items-center justify-center text-gray-300 text-6xl">
-        🏠
+      <div className="aspect-video bg-surface flex items-center justify-center">
+        <span className="text-[10px] tracking-widest uppercase text-stone">No photos yet</span>
       </div>
     )
   }
@@ -45,7 +45,7 @@ function PhotoSlideshow({ images }) {
   return (
     <>
       {/* Main image */}
-      <div className="relative rounded-xl overflow-hidden bg-gray-100 group">
+      <div className="relative overflow-hidden bg-surface group">
         <div className="aspect-video">
           <img
             src={images[active].url}
@@ -58,24 +58,24 @@ function PhotoSlideshow({ images }) {
         {/* Nav arrows — only show if multiple images */}
         {images.length > 1 && (
           <>
-            <button onClick={prev}
-              className="absolute left-3 top-1/2 -translate-y-1/2 bg-black bg-opacity-40 hover:bg-opacity-70 text-white rounded-full w-9 h-9 flex items-center justify-center transition opacity-0 group-hover:opacity-100">
+            <button onClick={prev} aria-label="Previous photo"
+              className="absolute left-3 top-1/2 -translate-y-1/2 bg-ink/50 hover:bg-ink/80 text-white w-9 h-9 flex items-center justify-center transition opacity-0 group-hover:opacity-100">
               ‹
             </button>
-            <button onClick={next}
-              className="absolute right-3 top-1/2 -translate-y-1/2 bg-black bg-opacity-40 hover:bg-opacity-70 text-white rounded-full w-9 h-9 flex items-center justify-center transition opacity-0 group-hover:opacity-100">
+            <button onClick={next} aria-label="Next photo"
+              className="absolute right-3 top-1/2 -translate-y-1/2 bg-ink/50 hover:bg-ink/80 text-white w-9 h-9 flex items-center justify-center transition opacity-0 group-hover:opacity-100">
               ›
             </button>
           </>
         )}
 
         {/* Photo counter */}
-        <div className="absolute bottom-3 right-3 bg-black bg-opacity-50 text-white text-xs px-2.5 py-1 rounded-full">
+        <div className="absolute bottom-3 right-3 bg-ink/60 text-white text-[10px] tracking-widest px-2.5 py-1">
           {active + 1} / {images.length}
         </div>
 
         {/* Expand hint */}
-        <div className="absolute bottom-3 left-3 bg-black bg-opacity-50 text-white text-xs px-2.5 py-1 rounded-full opacity-0 group-hover:opacity-100 transition">
+        <div className="absolute bottom-3 left-3 bg-ink/60 text-white text-[10px] tracking-widest uppercase px-2.5 py-1 opacity-0 group-hover:opacity-100 transition">
           Click to expand
         </div>
       </div>
@@ -84,9 +84,9 @@ function PhotoSlideshow({ images }) {
       {images.length > 1 && (
         <div className="flex gap-2 mt-2 overflow-x-auto pb-1">
           {images.map((img, i) => (
-            <button key={i} onClick={() => setActive(i)}
-              className={`flex-shrink-0 w-16 h-12 rounded-lg overflow-hidden border-2 transition ${
-                i === active ? 'border-red-700 opacity-100' : 'border-transparent opacity-60 hover:opacity-90'
+            <button key={i} onClick={() => setActive(i)} aria-label={`Show photo ${i + 1}`}
+              className={`flex-shrink-0 w-16 h-12 overflow-hidden border-2 transition ${
+                i === active ? 'border-maple opacity-100' : 'border-transparent opacity-60 hover:opacity-90'
               }`}>
               <img src={img.url} alt="" loading="lazy" className="w-full h-full object-cover" />
             </button>
@@ -98,9 +98,9 @@ function PhotoSlideshow({ images }) {
       {images.length > 1 && (
         <div className="flex justify-center gap-1.5 mt-2 md:hidden">
           {images.map((_, i) => (
-            <button key={i} onClick={() => setActive(i)}
+            <button key={i} onClick={() => setActive(i)} aria-label={`Show photo ${i + 1}`}
               className={`w-1.5 h-1.5 rounded-full transition-all ${
-                i === active ? 'bg-red-700 w-3' : 'bg-gray-300'
+                i === active ? 'bg-maple w-3' : 'bg-hairline'
               }`} />
           ))}
         </div>
@@ -109,12 +109,13 @@ function PhotoSlideshow({ images }) {
       {/* Lightbox */}
       {lightboxOpen && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-95 z-50 flex items-center justify-center"
+          className="fixed inset-0 bg-ink/95 z-50 flex items-center justify-center"
           onClick={() => setLightboxOpen(false)}
         >
           <button
             onClick={() => setLightboxOpen(false)}
-            className="absolute top-4 right-4 text-white text-2xl bg-white bg-opacity-10 rounded-full w-10 h-10 flex items-center justify-center hover:bg-opacity-20 transition z-10"
+            aria-label="Close photo viewer"
+            className="absolute top-4 right-4 text-white text-2xl bg-white/10 rounded-full w-10 h-10 flex items-center justify-center hover:bg-white/20 transition z-10"
           >
             ✕
           </button>
@@ -123,13 +124,15 @@ function PhotoSlideshow({ images }) {
             <>
               <button
                 onClick={e => { e.stopPropagation(); prev() }}
-                className="absolute left-4 text-white text-4xl bg-white bg-opacity-10 rounded-full w-12 h-12 flex items-center justify-center hover:bg-opacity-20 transition z-10"
+                aria-label="Previous photo"
+                className="absolute left-4 text-white text-4xl bg-white/10 rounded-full w-12 h-12 flex items-center justify-center hover:bg-white/20 transition z-10"
               >
                 ‹
               </button>
               <button
                 onClick={e => { e.stopPropagation(); next() }}
-                className="absolute right-4 text-white text-4xl bg-white bg-opacity-10 rounded-full w-12 h-12 flex items-center justify-center hover:bg-opacity-20 transition z-10"
+                aria-label="Next photo"
+                className="absolute right-4 text-white text-4xl bg-white/10 rounded-full w-12 h-12 flex items-center justify-center hover:bg-white/20 transition z-10"
               >
                 ›
               </button>
@@ -143,7 +146,7 @@ function PhotoSlideshow({ images }) {
             onClick={e => e.stopPropagation()}
           />
 
-          <div className="absolute bottom-4 text-white text-sm bg-black bg-opacity-50 px-3 py-1 rounded-full">
+          <div className="absolute bottom-4 text-white text-sm bg-ink/50 px-3 py-1">
             {active + 1} / {images.length}
           </div>
         </div>
@@ -317,34 +320,33 @@ export default function ListingDetailPage() {
 
   if (loading) return (
     <div className="max-w-5xl mx-auto px-4 py-10 animate-pulse space-y-4">
-      <div className="h-80 bg-gray-200 rounded-xl" />
-      <div className="h-6 bg-gray-200 rounded w-1/2" />
-      <div className="h-4 bg-gray-200 rounded w-1/3" />
+      <div className="h-80 bg-hairline" />
+      <div className="h-6 bg-hairline w-1/2" />
+      <div className="h-4 bg-hairline w-1/3" />
     </div>
   )
 
   if (notFound || !listing) return (
-    <div className="max-w-xl mx-auto px-4 py-16 text-center space-y-4">
-      <div className="text-5xl">🏚</div>
-      <p className="font-medium text-gray-700">Listing not found</p>
-      <p className="text-sm text-gray-500">It may have been removed or the link is incorrect.</p>
-      <Link to="/listings" className="inline-block text-red-700 text-sm font-medium hover:underline">
-        Browse listings
+    <div className="max-w-xl mx-auto px-4 py-24 text-center">
+      <div className="font-serif font-light text-5xl text-stone mb-6">∅</div>
+      <p className="font-serif font-normal text-2xl text-ink mb-2">Listing not found</p>
+      <p className="text-sm text-steel mb-8">It may have been removed or the link is incorrect.</p>
+      <Link to="/listings" className="text-[11px] tracking-widest uppercase text-maple hover:text-maple-dark transition-colors">
+        Browse listings →
       </Link>
     </div>
   )
 
   if (fetchError) return (
-    <div className="max-w-xl mx-auto px-4 py-16 text-center space-y-4">
-      <div className="text-4xl">⚠️</div>
-      <p className="font-medium text-gray-700">We couldn’t load this listing</p>
-      <p className="text-sm text-gray-500">{fetchError}</p>
-      <div className="flex justify-center gap-3">
+    <div className="max-w-xl mx-auto px-4 py-24 text-center">
+      <p className="font-serif font-normal text-2xl text-ink mb-2">We couldn&apos;t load this listing</p>
+      <p className="text-sm text-steel mb-8">{fetchError}</p>
+      <div className="flex justify-center items-center gap-6">
         <button onClick={fetchListing}
-          className="px-4 py-2 text-sm font-medium bg-red-700 text-white rounded-lg hover:bg-red-800 transition">
+          className="text-[11px] tracking-widest uppercase bg-ink text-canvas px-6 py-3 hover:bg-maple transition-colors">
           Try again
         </button>
-        <Link to="/listings" className="text-sm text-gray-500 hover:text-gray-700 self-center">
+        <Link to="/listings" className="text-[11px] tracking-widest uppercase text-steel hover:text-ink transition-colors">
           Back to listings
         </Link>
       </div>
@@ -360,17 +362,17 @@ export default function ListingDetailPage() {
     : 'Immediately'
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8">
+    <div className="max-w-5xl mx-auto px-4 md:px-6 py-8">
       {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-sm text-gray-400 mb-4">
-        <Link to="/listings" className="hover:text-gray-600 transition">← Back to listings</Link>
+      <div className="flex items-center gap-2 text-[11px] tracking-wide uppercase text-stone mb-6">
+        <Link to="/listings" className="hover:text-maple transition-colors">← Back to listings</Link>
         <span>/</span>
-        <span className="text-gray-600 truncate max-w-xs">{listing.title}</span>
+        <span className="text-steel truncate max-w-xs normal-case tracking-normal">{listing.title}</span>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-6">
+      <div className="grid lg:grid-cols-3 gap-8">
         {/* Left column */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-8">
 
           {/* Photo slideshow */}
           <PhotoSlideshow images={images} />
@@ -378,38 +380,39 @@ export default function ListingDetailPage() {
           {/* Title + price */}
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 leading-tight">{listing.title}</h1>
-              <p className="text-gray-500 mt-1 text-sm">
-                📍 {listing.neighbourhood ? `${listing.neighbourhood}, ` : ''}{listing.city}, PEI
+              <h1 className="font-serif font-normal text-ink leading-tight" style={{ fontSize: 'clamp(26px, 3.5vw, 38px)' }}>
+                {listing.title}
+              </h1>
+              <p className="text-[11px] tracking-wide uppercase text-stone mt-2">
+                {listing.neighbourhood ? `${listing.neighbourhood}, ` : ''}{listing.city}, PEI
               </p>
-              <div className="flex items-center gap-2 mt-2 flex-wrap text-xs text-gray-400">
+              <div className="flex items-center gap-2 mt-2 flex-wrap text-[10px] tracking-wide uppercase text-stone">
                 <span>Posted {new Date(listing.created_at).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                 <span>·</span>
-                <span>👁 {listing.views || 0} views</span>
-                {images.length > 0 && <><span>·</span><span>📷 {images.length} photo{images.length !== 1 ? 's' : ''}</span></>}
+                <span>{listing.views || 0} views</span>
+                {images.length > 0 && <><span>·</span><span>{images.length} photo{images.length !== 1 ? 's' : ''}</span></>}
               </div>
             </div>
             <div className="text-right">
-              <div className="text-3xl font-bold text-red-700">{formatPrice(listing.price)}</div>
-              {listing.price != null && <div className="text-sm text-gray-400">/month</div>}
+              <div className="font-serif font-normal text-3xl text-maple">{formatPrice(listing.price)}</div>
+              {listing.price != null && <div className="text-[10px] tracking-widest uppercase text-stone">/month</div>}
               {listing.utilities_included && (
-                <div className="text-xs text-green-600 font-medium mt-1">✓ Utilities included</div>
+                <div className="text-[10px] tracking-widest uppercase text-maple mt-1">Utilities included</div>
               )}
             </div>
           </div>
 
           {/* Quick stats */}
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-hairline border border-hairline">
             {[
-              { icon: '🏠', label: 'Type', value: TYPE_LABELS[listing.property_type] || listing.property_type },
-              { icon: '🛏', label: 'Bedrooms', value: listing.bedrooms },
-              { icon: '🚿', label: 'Bathrooms', value: listing.bathrooms },
-              { icon: '📐', label: 'Size', value: listing.square_feet ? `${listing.square_feet} sqft` : '—' },
+              { label: 'Type', value: TYPE_LABELS[listing.property_type] || listing.property_type },
+              { label: 'Bedrooms', value: listing.bedrooms },
+              { label: 'Bathrooms', value: listing.bathrooms },
+              { label: 'Size', value: listing.square_feet ? `${listing.square_feet} sqft` : '—' },
             ].map(s => (
-              <div key={s.label} className="bg-gray-50 rounded-xl p-3 text-center border border-gray-100">
-                <div className="text-xl mb-1">{s.icon}</div>
-                <div className="text-sm font-semibold text-gray-800">{s.value}</div>
-                <div className="text-xs text-gray-400 mt-0.5">{s.label}</div>
+              <div key={s.label} className="bg-canvas p-4 text-center">
+                <div className="font-serif font-normal text-xl text-ink">{s.value}</div>
+                <div className="text-[9px] tracking-widest uppercase text-stone mt-1">{s.label}</div>
               </div>
             ))}
           </div>
@@ -417,27 +420,27 @@ export default function ListingDetailPage() {
           {/* Description */}
           {listing.description && (
             <div>
-              <h2 className="font-semibold text-gray-800 mb-2 text-lg">About this place</h2>
-              <p className="text-gray-600 text-sm leading-relaxed whitespace-pre-line">{listing.description}</p>
+              <h2 className="font-serif font-normal text-2xl text-ink mb-3">About this place</h2>
+              <p className="text-steel text-sm leading-relaxed whitespace-pre-line">{listing.description}</p>
             </div>
           )}
 
           {/* Details grid */}
           <div>
-            <h2 className="font-semibold text-gray-800 mb-3 text-lg">Details</h2>
-            <div className="grid grid-cols-2 gap-y-3 gap-x-8 text-sm">
+            <h2 className="font-serif font-normal text-2xl text-ink mb-4">Details</h2>
+            <div className="grid sm:grid-cols-2 gap-y-1 gap-x-10 text-sm">
               {[
                 { label: 'Available', value: formatDate(listing.available_from) },
                 { label: 'Lease Term', value: LEASE_LABELS[listing.lease_term] || listing.lease_term },
                 { label: 'Laundry', value: listing.laundry === 'in_unit' ? 'In-Unit' : listing.laundry === 'shared' ? 'Shared' : 'None' },
-                { label: 'Utilities', value: listing.utilities_included ? '✅ Included' : '❌ Not included' },
-                { label: 'Pet Friendly', value: listing.pet_friendly ? '✅ Yes' : '❌ No' },
-                { label: 'Parking', value: listing.parking_available ? '✅ Available' : '❌ No' },
-                { label: 'Furnished', value: listing.furnished ? '✅ Yes' : '❌ No' },
+                { label: 'Utilities', value: listing.utilities_included ? 'Included' : 'Not included' },
+                { label: 'Pet Friendly', value: listing.pet_friendly ? 'Yes' : 'No' },
+                { label: 'Parking', value: listing.parking_available ? 'Available' : 'No' },
+                { label: 'Furnished', value: listing.furnished ? 'Yes' : 'No' },
               ].map(d => (
-                <div key={d.label} className="flex justify-between py-2 border-b border-gray-50">
-                  <span className="text-gray-500">{d.label}</span>
-                  <span className="text-gray-800 font-medium text-right">{d.value}</span>
+                <div key={d.label} className="flex justify-between py-2.5 border-b border-hairline-soft">
+                  <span className="text-[11px] tracking-wide uppercase text-stone self-center">{d.label}</span>
+                  <span className="text-charcoal text-right">{d.value}</span>
                 </div>
               ))}
             </div>
@@ -458,110 +461,110 @@ export default function ListingDetailPage() {
 
         {/* Right column — contact card */}
         <div className="space-y-4">
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 sticky top-20">
+          <div className="bg-canvas border border-hairline p-6 sticky top-20">
 
             {/* Landlord info */}
-            <Link to={`/profile/${landlord?.id}`} className="flex items-center gap-3 mb-4 pb-4 border-b border-gray-100 hover:opacity-80 transition">
-              <div className="w-11 h-11 bg-gradient-to-br from-red-600 to-red-800 rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
+            <Link to={`/profile/${landlord?.id}`} className="flex items-center gap-3 mb-5 pb-5 border-b border-hairline hover:opacity-80 transition">
+              <div className="w-11 h-11 bg-maple flex items-center justify-center text-white font-normal text-lg flex-shrink-0 overflow-hidden">
                 {landlord?.avatar_url
-                  ? <img src={landlord.avatar_url} alt="" className="w-full h-full rounded-full object-cover" />
+                  ? <img src={landlord.avatar_url} alt="" className="w-full h-full object-cover" />
                   : (landlord?.full_name || landlord?.email || '?')[0].toUpperCase()
                 }
               </div>
               <div className="min-w-0">
-                <p className="font-medium text-gray-800 text-sm">{landlord?.full_name || 'Landlord'}</p>
-                <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                <p className="font-normal text-ink text-sm">{landlord?.full_name || 'Landlord'}</p>
+                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                   {landlord?.email_verified && (
-                    <span className="text-xs bg-green-50 text-green-700 px-1.5 py-0.5 rounded-full font-medium border border-green-200">✓ Verified</span>
+                    <span className="text-[9px] tracking-widest uppercase border border-hairline text-maple px-1.5 py-0.5">✓ Verified</span>
                   )}
                   {landlord?.avg_rating > 0 && (
-                    <span className="text-xs text-amber-500">{'★'.repeat(Math.round(landlord.avg_rating))} {landlord.avg_rating.toFixed(1)}</span>
+                    <span className="text-xs text-maple">{'★'.repeat(Math.round(landlord.avg_rating))} {landlord.avg_rating.toFixed(1)}</span>
                   )}
                 </div>
               </div>
             </Link>
 
             {/* Price */}
-            <div className="text-center mb-5">
-              <div className="text-3xl font-bold text-red-700">{formatPrice(listing.price)}</div>
-              {listing.price != null && <div className="text-xs text-gray-400 mt-0.5">per month</div>}
+            <div className="text-center mb-6">
+              <div className="font-serif font-normal text-3xl text-maple">{formatPrice(listing.price)}</div>
+              {listing.price != null && <div className="text-[10px] tracking-widest uppercase text-stone mt-0.5">per month</div>}
             </div>
 
             {user && !isOwnListing && (
               <button
                 onClick={() => toggleSave(listing.id)}
                 aria-label={saved ? 'Unsave listing' : 'Save listing'}
-                className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border text-sm font-medium transition mb-3 ${
+                className={`w-full flex items-center justify-center gap-2 py-3 border text-[11px] tracking-widest uppercase transition mb-3 ${
                   saved
-                    ? 'border-red-200 text-red-700 bg-red-50 hover:bg-red-100'
-                    : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                    ? 'border-maple text-maple bg-maple-light/40 hover:bg-maple-light'
+                    : 'border-hairline text-steel hover:border-maple hover:text-maple'
                 }`}
               >
-                <span>{saved ? '♥' : '♡'}</span>
+                <span aria-hidden="true">{saved ? '♥' : '♡'}</span>
                 {saved ? 'Saved' : 'Save Listing'}
               </button>
             )}
 
             {contactError && (
-              <div className="bg-red-50 text-red-700 text-xs px-3 py-2 rounded-lg mb-3 border border-red-100">
+              <div className="bg-maple-light border border-maple-muted text-maple-dark text-xs px-3 py-2 mb-3" role="alert">
                 {contactError}
               </div>
             )}
 
             {isOwnListing ? (
               <div className="space-y-2">
-                <div className="text-center text-sm text-gray-500 py-2 bg-gray-50 rounded-lg">
+                <div className="text-center text-[11px] tracking-widest uppercase text-stone py-2.5 bg-surface">
                   This is your listing
                 </div>
                 <Link to={`/listings/${listing.id}/edit`}
-                  className="block w-full text-center py-2.5 text-sm font-medium border border-gray-200 rounded-lg hover:bg-gray-50 transition">
+                  className="block w-full text-center py-3 text-[11px] tracking-widest uppercase border border-hairline text-steel hover:border-maple hover:text-maple transition-colors">
                   Edit Listing
                 </Link>
               </div>
             ) : (
               <button onClick={handleContact} disabled={contacting}
-                className="w-full bg-red-700 text-white py-3 rounded-lg font-semibold text-sm hover:bg-red-800 transition disabled:opacity-50 flex items-center justify-center gap-2">
-                {contacting ? <><span className="animate-spin">⏳</span> Opening chat...</> : '💬 Contact Landlord'}
+                className="w-full bg-ink text-canvas py-4 text-[11px] tracking-widest uppercase hover:bg-maple transition-colors disabled:opacity-40">
+                {contacting ? 'Opening chat...' : 'Contact Landlord'}
               </button>
             )}
 
             {!user && (
-              <p className="text-xs text-gray-400 text-center mt-2">
-                <Link to="/signup" className="text-red-700 hover:underline font-medium">Sign up</Link> or{' '}
-                <Link to="/login" className="text-red-700 hover:underline font-medium">log in</Link> to message
+              <p className="text-xs text-stone text-center mt-3">
+                <Link to="/signup" className="text-maple hover:text-maple-dark transition-colors">Sign up</Link> or{' '}
+                <Link to="/login" className="text-maple hover:text-maple-dark transition-colors">log in</Link> to message
               </p>
             )}
 
-            <div className="mt-4 pt-4 border-t border-gray-100 text-xs text-gray-400 text-center space-y-1">
-              <p>👁 {listing.views || 0} views · 📷 {images.length} photo{images.length !== 1 ? 's' : ''}</p>
+            <div className="mt-5 pt-5 border-t border-hairline text-[10px] tracking-wide uppercase text-stone text-center space-y-1">
+              <p>{listing.views || 0} views · {images.length} photo{images.length !== 1 ? 's' : ''}</p>
               <p>Listed {new Date(listing.created_at).toLocaleDateString('en-CA')}</p>
             </div>
           </div>
 
           {reportDone ? (
-            <p className="text-xs text-gray-400 text-center py-2">✓ Report submitted</p>
+            <p className="text-[10px] tracking-widest uppercase text-stone text-center py-2">✓ Report submitted</p>
           ) : (
             <button
               onClick={() => {
                 if (!user) { navigate('/login'); return }
                 setReportOpen(true)
               }}
-              className="w-full text-xs text-gray-400 hover:text-gray-500 text-center py-2 transition"
+              className="w-full text-[10px] tracking-widest uppercase text-stone hover:text-steel text-center py-2 transition-colors"
             >
-              🚩 Report this listing
+              Report this listing
             </button>
           )}
 
           {reportOpen && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center px-4">
-              <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 space-y-4">
-                <h3 className="font-semibold text-gray-900">Report Listing</h3>
+            <div className="fixed inset-0 bg-ink/50 z-50 flex items-center justify-center px-4" role="dialog" aria-modal="true" aria-label="Report listing">
+              <div className="bg-canvas border border-hairline shadow-card-hover max-w-sm w-full p-6 space-y-4">
+                <h3 className="font-serif font-normal text-xl text-ink">Report Listing</h3>
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Reason *</label>
+                  <label className="block text-[10px] tracking-widest uppercase text-stone mb-1">Reason *</label>
                   <select
                     value={reportReason}
                     onChange={e => setReportReason(e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
+                    className="w-full border border-hairline bg-canvas px-3 py-2.5 text-sm text-charcoal focus:outline-none focus:border-maple transition-colors"
                   >
                     <option value="">Select a reason...</option>
                     <option value="spam">Spam or duplicate</option>
@@ -573,28 +576,28 @@ export default function ListingDetailPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Details (optional)</label>
+                  <label className="block text-[10px] tracking-widest uppercase text-stone mb-1">Details (optional)</label>
                   <textarea
                     rows={3}
                     value={reportDetails}
                     onChange={e => setReportDetails(e.target.value)}
                     placeholder="Any additional context..."
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
+                    className="w-full border border-hairline bg-canvas px-3 py-2.5 text-sm text-charcoal placeholder:text-stone focus:outline-none focus:border-maple transition-colors"
                     maxLength={1000}
                   />
                 </div>
-                {reportError && <p className="text-xs text-red-600">{reportError}</p>}
+                {reportError && <p className="text-xs text-maple-dark" role="alert">{reportError}</p>}
                 <div className="flex gap-2">
                   <button
                     onClick={handleReport}
                     disabled={!reportReason || reportSubmitting}
-                    className="flex-1 bg-red-700 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-red-800 transition disabled:opacity-50"
+                    className="flex-1 bg-ink text-canvas py-3 text-[11px] tracking-widest uppercase hover:bg-maple transition-colors disabled:opacity-40"
                   >
                     {reportSubmitting ? 'Submitting...' : 'Submit Report'}
                   </button>
                   <button
                     onClick={() => { setReportOpen(false); setReportReason(''); setReportDetails(''); setReportError(null) }}
-                    className="flex-1 border border-gray-200 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-50 transition"
+                    className="flex-1 border border-hairline py-3 text-[11px] tracking-widest uppercase text-steel hover:border-maple hover:text-maple transition-colors"
                   >
                     Cancel
                   </button>

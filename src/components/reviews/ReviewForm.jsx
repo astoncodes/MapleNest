@@ -21,7 +21,7 @@ function StarPicker({ value, onChange }) {
           onMouseLeave={() => setHover(0)}
           onClick={() => onChange(n)}
           className="text-2xl transition-transform hover:scale-110 focus:outline-none">
-          <span className={(hover || value) >= n ? 'text-amber-400' : 'text-gray-200'}>★</span>
+          <span className={(hover || value) >= n ? 'text-maple' : 'text-gray-200'}>★</span>
         </button>
       ))}
     </span>
@@ -81,21 +81,21 @@ export default function ReviewForm({ tenancyId, reviewerId, revieweeId, listingI
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label className="block text-xs font-medium text-gray-500 mb-2">Rating</label>
+        <label className="block text-xs font-medium text-steel mb-2">Rating</label>
         <StarPicker value={rating} onChange={setRating} />
       </div>
 
       <div>
-        <label className="block text-xs font-medium text-gray-500 mb-2">
-          Tags <span className="text-gray-400">(optional, up to 4)</span>
+        <label className="block text-xs font-medium text-steel mb-2">
+          Tags <span className="text-stone">(optional, up to 4)</span>
         </label>
         <div className="flex flex-wrap gap-1.5">
           {tags.positive.map(tag => (
             <button key={tag} type="button" onClick={() => toggleTag(tag)}
               className={`px-2.5 py-1 rounded-full text-xs font-medium transition ${
                 selectedTags.includes(tag)
-                  ? 'bg-green-100 text-green-800 border border-green-300'
-                  : 'bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100'
+                  ? 'bg-maple-light text-green-800 border border-green-300'
+                  : 'bg-surface text-steel border border-hairline hover:bg-surface'
               }`}>
               {tag}
             </button>
@@ -104,8 +104,8 @@ export default function ReviewForm({ tenancyId, reviewerId, revieweeId, listingI
             <button key={tag} type="button" onClick={() => toggleTag(tag)}
               className={`px-2.5 py-1 rounded-full text-xs font-medium transition ${
                 selectedTags.includes(tag)
-                  ? 'bg-red-100 text-red-800 border border-red-300'
-                  : 'bg-gray-50 text-gray-500 border border-gray-200 hover:bg-gray-100'
+                  ? 'bg-maple-muted text-red-800 border border-red-300'
+                  : 'bg-surface text-steel border border-hairline hover:bg-surface'
               }`}>
               {tag}
             </button>
@@ -114,29 +114,29 @@ export default function ReviewForm({ tenancyId, reviewerId, revieweeId, listingI
       </div>
 
       <div>
-        <label className="block text-xs font-medium text-gray-500 mb-1">Comment <span className="text-gray-400">(optional)</span></label>
+        <label className="block text-xs font-medium text-steel mb-1">Comment <span className="text-stone">(optional)</span></label>
         <textarea
           rows={3}
           value={comment}
           onChange={e => setComment(e.target.value)}
           maxLength={300}
           placeholder="Anything else you'd like to share?"
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
+          className="w-full border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-maple/30"
         />
-        <p className="text-xs text-gray-400 text-right mt-0.5">{comment.length}/300</p>
+        <p className="text-xs text-stone text-right mt-0.5">{comment.length}/300</p>
       </div>
 
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {error && <p className="text-xs text-maple-dark">{error}</p>}
 
       <div className="flex gap-2 justify-end">
         {onCancel && (
           <button type="button" onClick={onCancel}
-            className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">
+            className="px-4 py-2 text-sm text-steel hover:text-charcoal">
             Cancel
           </button>
         )}
         <button type="submit" disabled={saving || !rating}
-          className="px-5 py-2 bg-red-700 text-white text-sm font-medium rounded-lg hover:bg-red-800 transition disabled:opacity-50">
+          className="px-5 py-2 bg-maple text-white text-sm font-medium rounded-lg hover:bg-maple-dark transition disabled:opacity-50">
           {saving ? 'Submitting...' : 'Submit Review'}
         </button>
       </div>

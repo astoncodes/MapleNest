@@ -310,10 +310,10 @@ export default function ListingsPage() {
                 <div>
                   <div className="text-[9px] tracking-widest uppercase text-stone mb-3 border-b border-hairline pb-2">Price (CAD/mo)</div>
                   <div className="flex gap-2">
-                    <input type="number" placeholder="Min" value={filters.minPrice}
+                    <input type="number" inputMode="numeric" min="0" aria-label="Minimum price" placeholder="Min" value={filters.minPrice}
                       onChange={e => updateFilter('minPrice', e.target.value)}
                       className="w-full border-b border-hairline bg-transparent py-1.5 text-xs text-charcoal placeholder:text-stone focus:outline-none focus:border-maple transition" />
-                    <input type="number" placeholder="Max" value={filters.maxPrice}
+                    <input type="number" inputMode="numeric" min="0" aria-label="Maximum price" placeholder="Max" value={filters.maxPrice}
                       onChange={e => updateFilter('maxPrice', e.target.value)}
                       className="w-full border-b border-hairline bg-transparent py-1.5 text-xs text-charcoal placeholder:text-stone focus:outline-none focus:border-maple transition" />
                   </div>

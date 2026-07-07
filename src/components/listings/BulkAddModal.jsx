@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 
-const inputClass = "w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
-const labelClass = "block text-xs font-medium text-gray-500 mb-1"
+const inputClass = "w-full border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-maple/30"
+const labelClass = "block text-xs font-medium text-steel mb-1"
 
 export default function BulkAddModal({ listingId, existingCount, onSaved, onClose }) {
   const [count, setCount] = useState('')
@@ -43,10 +43,10 @@ export default function BulkAddModal({ listingId, existingCount, onSaved, onClos
         role="dialog"
         aria-modal="true"
         aria-labelledby="bulk-modal-title"
-        className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 space-y-4"
+        className="bg-canvas rounded-xl shadow-xl w-full max-w-sm p-6 space-y-4"
         onClick={e => e.stopPropagation()}
       >
-        <h3 id="bulk-modal-title" className="font-semibold text-gray-900">Bulk Add Units</h3>
+        <h3 id="bulk-modal-title" className="font-semibold text-ink">Bulk Add Units</h3>
 
         <div>
           <label className={labelClass}>How many units?</label>
@@ -58,7 +58,7 @@ export default function BulkAddModal({ listingId, existingCount, onSaved, onClos
           <label className={labelClass}>Name prefix</label>
           <input className={inputClass} placeholder="Unit" maxLength={30}
             value={prefix} onChange={e => setPrefix(e.target.value)} />
-          <p className="text-xs text-gray-400 mt-1">
+          <p className="text-xs text-stone mt-1">
             Will generate: {prefix || 'Unit'} {existingCount + 1}, {prefix || 'Unit'} {existingCount + 2}...
           </p>
         </div>
@@ -69,22 +69,22 @@ export default function BulkAddModal({ listingId, existingCount, onSaved, onClos
             {[{ val: false, label: 'Whole unit' }, { val: true, label: 'Individual rooms' }].map(opt => (
               <button key={String(opt.val)} type="button"
                 onClick={() => setRoomRental(opt.val)}
-                className={`flex-1 py-2 rounded-lg border text-sm font-medium transition ${roomRental === opt.val ? 'bg-red-700 text-white border-red-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
+                className={`flex-1 py-2 rounded-lg border text-sm font-medium transition ${roomRental === opt.val ? 'bg-maple text-white border-red-700' : 'border-hairline text-steel hover:bg-surface'}`}>
                 {opt.label}
               </button>
             ))}
           </div>
         </div>
 
-        {error && <p className="text-xs text-red-600">{error}</p>}
+        {error && <p className="text-xs text-maple-dark">{error}</p>}
 
         <div className="flex gap-2">
           <button onClick={handleSave} disabled={saving || !count}
-            className="flex-1 bg-red-700 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-red-800 transition disabled:opacity-50">
+            className="flex-1 bg-maple text-white py-2.5 rounded-lg text-sm font-medium hover:bg-maple-dark transition disabled:opacity-50">
             {saving ? 'Adding...' : 'Add Units'}
           </button>
           <button onClick={onClose}
-            className="flex-1 border border-gray-200 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-50 transition">
+            className="flex-1 border border-hairline py-2.5 rounded-lg text-sm font-medium hover:bg-surface transition">
             Cancel
           </button>
         </div>

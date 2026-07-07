@@ -20,12 +20,12 @@ export default function TenancyBar({ tenancy, onEnded, onAssignClick }) {
   // No active/ended tenancy — show assign button
   if (!tenancy) {
     return (
-      <div className="bg-gray-50 border-b border-gray-200 px-4 py-2.5 flex items-center justify-between">
-        <span className="text-xs text-gray-500">No tenant assigned</span>
+      <div className="bg-surface border-b border-hairline px-4 py-2.5 flex items-center justify-between">
+        <span className="text-xs text-steel">No tenant assigned</span>
         <button
           type="button"
           onClick={onAssignClick}
-          className="text-xs font-medium text-red-700 hover:text-red-800"
+          className="text-xs font-medium text-maple-dark hover:text-maple-dark"
         >
           Assign to unit
         </button>
@@ -55,7 +55,7 @@ export default function TenancyBar({ tenancy, onEnded, onAssignClick }) {
     const moveInDate = new Date(tenancy.move_in).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' })
 
     return (
-      <div className="bg-green-50 border-b border-green-200 px-4 py-2.5">
+      <div className="bg-maple-light border-b border-maple-muted px-4 py-2.5">
         <div className="flex items-center justify-between">
           <span className="text-xs text-green-800">
             Tenant: <strong>{tenancy.unit?.unit_name || 'Unit'}</strong>
@@ -66,7 +66,7 @@ export default function TenancyBar({ tenancy, onEnded, onAssignClick }) {
             <button
               type="button"
               onClick={() => setConfirming(true)}
-              className="text-xs font-medium text-green-700 hover:text-green-900"
+              className="text-xs font-medium text-maple-dark hover:text-green-900"
             >
               End tenancy
             </button>
@@ -75,22 +75,22 @@ export default function TenancyBar({ tenancy, onEnded, onAssignClick }) {
 
         {confirming && (
           <div className="mt-2 flex items-center gap-2">
-            <label className="text-xs text-gray-500">Move-out date:</label>
+            <label className="text-xs text-steel">Move-out date:</label>
             <input
               type="date"
               value={moveOut}
               onChange={e => setMoveOut(e.target.value)}
-              className="border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-red-300"
+              className="border border-hairline rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-maple/30"
             />
             <button type="button" onClick={handleEndTenancy} disabled={ending}
-              className="text-xs font-medium text-red-700 hover:text-red-800 disabled:opacity-50">
+              className="text-xs font-medium text-maple-dark hover:text-maple-dark disabled:opacity-50">
               {ending ? 'Ending...' : 'Confirm'}
             </button>
             <button type="button" onClick={() => setConfirming(false)}
-              className="text-xs text-gray-400 hover:text-gray-600">
+              className="text-xs text-stone hover:text-steel">
               Cancel
             </button>
-            {error && <span className="text-xs text-red-600">{error}</span>}
+            {error && <span className="text-xs text-maple-dark">{error}</span>}
           </div>
         )}
       </div>

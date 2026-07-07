@@ -43,7 +43,7 @@ export default function UnitStrip({ units }) {
 
   if (available.length === 0) {
     return (
-      <p className="text-xs text-gray-400 mt-1">No units currently available</p>
+      <p className="text-xs text-stone mt-1">No units currently available</p>
     )
   }
 
@@ -55,13 +55,13 @@ export default function UnitStrip({ units }) {
       {preview.map(u => (
         <span
           key={u.id}
-          className="bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-full"
+          className="bg-surface text-steel text-xs px-2 py-0.5 rounded-full"
         >
           {u.unit_name}
         </span>
       ))}
       {overflow > 0 && (
-        <span className="text-xs text-red-700 font-medium">+{overflow} more →</span>
+        <span className="text-xs text-maple-dark font-medium">+{overflow} more →</span>
       )}
     </div>
   )

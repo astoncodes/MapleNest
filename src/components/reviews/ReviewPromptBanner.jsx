@@ -17,7 +17,7 @@ export default function ReviewPromptBanner({
       ? new Date(reviewWindowClosesAt).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })
       : null
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-500">
+      <div className="bg-surface border border-hairline rounded-lg px-4 py-3 text-sm text-steel">
         Your review has been submitted. It will become visible once the other party also submits
         {dateStr ? `, or after the review window closes on ${dateStr}.` : '.'}
       </div>
@@ -36,8 +36,8 @@ export default function ReviewPromptBanner({
 
   if (showForm) {
     return (
-      <div className="bg-white border border-gray-200 rounded-lg p-4">
-        <h3 className="text-sm font-semibold text-gray-800 mb-3">
+      <div className="bg-canvas border border-hairline rounded-lg p-4">
+        <h3 className="text-sm font-semibold text-ink mb-3">
           Leave a review{listingTitle ? ` for ${listingTitle}` : ''}
         </h3>
         <ReviewForm
@@ -61,7 +61,7 @@ export default function ReviewPromptBanner({
     : null
 
   return (
-    <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 flex items-center justify-between">
+    <div className="bg-maple-light border border-maple-muted rounded-lg px-4 py-3 flex items-center justify-between">
       <p className="text-sm text-amber-800">
         {isRenter
           ? `Your stay at ${listingTitle || 'this listing'} ended${moveOutDate ? ` on ${moveOutDate}` : ''}. Leave a review.`
