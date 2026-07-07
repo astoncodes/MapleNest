@@ -42,7 +42,9 @@ No servers to patch or scale; both platforms are managed.
 2. CI must pass: lint → tests → production build → audit.
 3. If the change includes SQL: run it in the Supabase SQL Editor **before** merging the frontend change that depends on it (schema is idempotent; functions are additive, so old clients keep working).
 4. Merge → Vercel auto-deploys `main`.
-5. Smoke test (2 min): load `/`, `/listings`, open a listing, log in, open `/messages`, send a message.
+5. Smoke test: `npm run build && npm run preview &` then `npm run smoke`
+   (automated: homepage, listings, search, detail, 404, auth, protected
+   redirect, mobile). Manually: log in, open `/messages`, send a message.
 6. Rollback: Vercel → promote previous deployment. SQL rollback per-file notes in `supabase/README.md`.
 
 ## Monitoring & incident basics

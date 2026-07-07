@@ -84,7 +84,13 @@ npm test           # Vitest, single run
 npm run test:watch
 npm run build      # production build -> dist/
 npm run preview    # serve the production build locally
+npm run smoke      # Chrome-driven smoke test against the preview server
 ```
+
+`npm run smoke` drives the production build in headless Chrome (system Chrome,
+no browser download): homepage, listings grid, search, listing detail, 404,
+auth pages, protected-route redirect, and mobile viewport — failing on any
+console or page error. Run `npm run build && npm run preview` first.
 
 ## Deployment (Vercel)
 
